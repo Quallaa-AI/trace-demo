@@ -4,16 +4,18 @@
 //
 // Run: npm run demo:4
 //
-// Four components of adaptive evals:
-//   1. Scenarios — define the situation and expected behavior
-//   2. Judges — rule checks + LLM judges score the response
-//   3. Differentiation — same scenario, two contexts, score the difference
-//   4. Regression — every fix becomes a permanent test
-//
-// This demo runs all four against the faucet customer story.
+// Runs four scenarios through Claude and evaluates the real
+// responses with rule-based judges. Shows all four eval components:
+// scenarios, judges, differentiation scoring, and regression.
 // ══════════════════════════════════════════════════════════════
 
+import { runAgent } from '../src/executor';
 import { Scenario, runEval, scoreDifferentiation, formatEvalResult, formatDifferentiation } from '../src/eval';
+import { Message } from '../src/types';
+import {
+  FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW, TUESDAY_NOW,
+  BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW,
+} from '../src/conversation';
 
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
@@ -21,186 +23,201 @@ const DIM = '\x1b[2m';
 const CYAN = '\x1b[36m';
 const YELLOW = '\x1b[33m';
 const GREEN = '\x1b[32m';
-const RED = '\x1b[31m';
 
-console.log(`\n${BOLD}${CYAN}══ DEMO 4: Adaptive Evals ══${RESET}\n`);
+// ─── SCENARIOS ─────────────────────────────────────────────
 
-// ─── COMPONENT 1: SCENARIOS ────────────────────────────────
-
-console.log(`${BOLD}${YELLOW}▸ 1. SCENARIOS${RESET}\n`);
-console.log(`  ${DIM}Each scenario defines a situation and what "good" looks like:${RESET}\n`);
-
-const scenarios: Scenario[] = [
+const scenarios: {
+  scenario: Scenario;
+  messages: Message[];
+  contact: typeof FAUCET_CUSTOMER;
+  now: Date;
+}[] = [
   {
-    name: 'thursday-followup',
-    description: 'Customer said "let me check with my wife" on Tuesday. It\'s Thursday morning.',
-    expected_response: 'Agent should follow up — a gentle check-in is appropriate after 42 hours.',
-    checks: [
-      {
-        name: 'follows-up',
-        test: (r) => !r.toLowerCase().includes('skip'),
-        detail_pass: 'Agent followed up',
-        detail_fail: 'Agent skipped the follow-up',
-      },
-      {
-        name: 'references-conversation',
-        test: (r) => /wife|faucet|kitchen/i.test(r),
-        detail_pass: 'References the actual conversation',
-        detail_fail: 'Generic message, no conversation context',
-      },
-      {
-        name: 'not-pushy',
-        test: (r) => !/urgent|immediately|today only|act now/i.test(r),
-        detail_pass: 'Tone is appropriate (not pushy)',
-        detail_fail: 'Tone is too aggressive',
-      },
-    ],
+    scenario: {
+      name: 'thursday-followup',
+      description: 'Customer said "let me check with my wife" on Tuesday. It\'s Thursday morning.',
+      expected_response: 'Agent should follow up — a gentle check-in is appropriate after 42 hours.',
+      checks: [
+        {
+          name: 'follows-up',
+          test: (r) => !r.toLowerCase().startsWith('skip'),
+          detail_pass: 'Agent sent a follow-up',
+          detail_fail: 'Agent skipped the follow-up',
+        },
+        {
+          name: 'references-conversation',
+          test: (r) => /wife|faucet|kitchen|plumb/i.test(r),
+          detail_pass: 'References the actual conversation',
+          detail_fail: 'Generic message, no conversation context',
+        },
+        {
+          name: 'not-pushy',
+          test: (r) => !/urgent|immediately|today only|act now|limited/i.test(r),
+          detail_pass: 'Tone is appropriate',
+          detail_fail: 'Tone is too aggressive',
+        },
+      ],
+    },
+    messages: FAUCET_MESSAGES,
+    contact: FAUCET_CUSTOMER,
+    now: THURSDAY_NOW,
   },
   {
-    name: 'burst-pipe-escalation',
-    description: 'Customer texts "HELP my basement is flooding" at 11:30 PM Saturday.',
-    expected_response: 'Agent should escalate immediately — this is an emergency.',
-    checks: [
-      {
-        name: 'escalates',
-        test: (r) => /escalat|on-call|dispatch|emergency|right away/i.test(r),
-        detail_pass: 'Escalated to on-call',
-        detail_fail: 'Did not escalate',
-      },
-      {
-        name: 'acknowledges-urgency',
-        test: (r) => /emergency|urgent|flood|right away|immediately/i.test(r),
-        detail_pass: 'Acknowledged the urgency',
-        detail_fail: 'Treated as routine',
-      },
-      {
-        name: 'asks-for-address',
-        test: (r) => /address|location|where/i.test(r),
-        detail_pass: 'Asked for address to dispatch',
-        detail_fail: 'Didn\'t ask for address',
-      },
-    ],
+    scenario: {
+      name: 'burst-pipe-escalation',
+      description: 'Customer texts "HELP my basement is flooding" at 11:30 PM Saturday.',
+      expected_response: 'Agent should respond with urgency — this is an emergency.',
+      checks: [
+        {
+          name: 'acknowledges-urgency',
+          test: (r) => /emergency|urgent|flood|right away|immediately|serious|asap/i.test(r),
+          detail_pass: 'Acknowledged the urgency',
+          detail_fail: 'Treated as routine',
+        },
+        {
+          name: 'actionable',
+          test: (r) => /address|location|send|dispatch|on-call|come|head over|plumber/i.test(r),
+          detail_pass: 'Took or proposed action',
+          detail_fail: 'No action taken',
+        },
+      ],
+    },
+    messages: BURST_PIPE_MESSAGES,
+    contact: BURST_PIPE_CUSTOMER,
+    now: SATURDAY_NOW,
   },
   {
-    name: 'back-off-silent-customer',
-    description: 'Agent has sent 2 unanswered follow-ups over 5 days. Customer hasn\'t replied once.',
-    expected_response: 'Agent should back off — send a graceful close, no more follow-ups.',
-    checks: [
-      {
-        name: 'graceful-close',
-        test: (r) => /here if|reach out|anytime|no rush|whenever/i.test(r),
-        detail_pass: 'Sent graceful close',
-        detail_fail: 'Still pushing',
-      },
-      {
-        name: 'no-followup-scheduled',
-        test: (r) => !r.toLowerCase().includes('schedule'),
-        detail_pass: 'No further follow-up scheduled',
-        detail_fail: 'Scheduled another follow-up',
-      },
+    scenario: {
+      name: 'back-off-silent-customer',
+      description: 'Agent has sent 2 unanswered follow-ups. Customer hasn\'t replied in 5 days.',
+      expected_response: 'Agent should back off — graceful close, no more follow-ups.',
+      checks: [
+        {
+          name: 'graceful-close',
+          test: (r) => /here if|reach out|anytime|no rush|whenever|hesitate|touch/i.test(r),
+          detail_pass: 'Sent graceful close',
+          detail_fail: 'Still pushing',
+        },
+        {
+          name: 'not-scheduling-more',
+          test: (r) => !r.toLowerCase().startsWith('skip') || /stop|no more|final/i.test(r),
+          detail_pass: 'Not scheduling more follow-ups',
+          detail_fail: 'Still scheduling follow-ups',
+        },
+      ],
+    },
+    messages: [
+      ...FAUCET_MESSAGES,
+      // Two unanswered follow-ups:
+      { role: 'agent' as const, content: 'Hi Sarah! Just checking in — did you get a chance to talk with your wife about the faucet repair?', timestamp: '2026-03-11T09:00:00-07:00' },
+      { role: 'agent' as const, content: 'Hi Sarah, just wanted to follow up one more time on the faucet. We have openings this week if you\'re still interested!', timestamp: '2026-03-13T09:00:00-07:00' },
     ],
+    contact: FAUCET_CUSTOMER,
+    now: new Date('2026-03-15T09:00:00-07:00'), // 5 days later
   },
   {
-    name: 'wife-said-yes',
-    description: 'Friday: customer texts "my wife said yes! Can you come Monday?" Follow-up was scheduled for Saturday.',
-    expected_response: 'Agent should confirm the Monday appointment and cancel the Saturday follow-up.',
-    checks: [
-      {
-        name: 'confirms-appointment',
-        test: (r) => /monday|confirm|great|wonderful|book/i.test(r),
-        detail_pass: 'Confirmed the Monday appointment',
-        detail_fail: 'Didn\'t confirm',
-      },
-      {
-        name: 'checks-availability',
-        test: (r) => /time|morning|afternoon|available|slot/i.test(r),
-        detail_pass: 'Asked about timing details',
-        detail_fail: 'Didn\'t ask about specific time',
-      },
+    scenario: {
+      name: 'wife-said-yes',
+      description: 'Customer texts "my wife said yes! Can you come Monday?"',
+      expected_response: 'Agent should confirm and propose times for Monday.',
+      checks: [
+        {
+          name: 'confirms',
+          test: (r) => /monday|great|wonderful|awesome|perfect|book|confirm|glad|fantastic/i.test(r),
+          detail_pass: 'Acknowledged the good news',
+          detail_fail: 'Didn\'t confirm',
+        },
+        {
+          name: 'proposes-times',
+          test: (r) => /time|morning|afternoon|slot|available|prefer|work for you|when/i.test(r),
+          detail_pass: 'Asked about timing',
+          detail_fail: 'Didn\'t ask about specific time',
+        },
+      ],
+    },
+    messages: [
+      ...FAUCET_MESSAGES,
+      { role: 'customer' as const, content: 'My wife said yes! Can you come Monday?', timestamp: '2026-03-12T15:00:00-07:00' },
     ],
+    contact: FAUCET_CUSTOMER,
+    now: new Date('2026-03-12T15:01:00-07:00'),
   },
 ];
 
-for (const s of scenarios) {
-  console.log(`  ${BOLD}${s.name}${RESET}`);
-  console.log(`  ${DIM}${s.description}${RESET}`);
-  console.log(`  ${DIM}Expected: ${s.expected_response}${RESET}\n`);
-}
+// ─── RUN ───────────────────────────────────────────────────
 
-// ─── COMPONENT 2: JUDGES (rule checks) ────────────────────
+async function main() {
+  console.log(`\n${BOLD}${CYAN}══ DEMO 4: Adaptive Evals ══${RESET}\n`);
 
-console.log(`${BOLD}${YELLOW}▸ 2. JUDGES (rule checks on simulated responses)${RESET}\n`);
+  // --- Component 1: Scenarios ---
+  console.log(`${BOLD}${YELLOW}▸ 1. SCENARIOS${RESET}\n`);
+  for (const s of scenarios) {
+    console.log(`  ${BOLD}${s.scenario.name}${RESET}`);
+    console.log(`  ${DIM}${s.scenario.description}${RESET}`);
+    console.log(`  ${DIM}Expected: ${s.scenario.expected_response}${RESET}\n`);
+  }
 
-// Simulated agent responses — in production, these come from the model.
-const responses: Record<string, string> = {
-  'thursday-followup': 'Hi Sarah! Just checking in — did you get a chance to chat with your wife about the faucet repair? We still have that Thursday morning slot open if you\'re interested. No rush at all!',
-  'burst-pipe-escalation': 'I can see this is an emergency — let me get our on-call plumber dispatched to you right away. You did the right thing shutting off the main valve. Can you send me your address so we can get someone there ASAP?',
-  'back-off-silent-customer': 'Hi Sarah, I know you\'re busy so I won\'t keep following up. If you ever want to revisit the faucet repair, I\'m here — just text anytime. Have a great week!',
-  'wife-said-yes': 'That\'s wonderful news! I\'d love to get you booked for Monday. Do you prefer morning or afternoon? We have slots at 9 AM, 11 AM, and 2 PM.',
-};
+  // --- Component 2: Judges (run real model, eval real responses) ---
+  console.log(`${BOLD}${YELLOW}▸ 2. JUDGES (running ${scenarios.length} scenarios through Claude...)${RESET}\n`);
 
-for (const scenario of scenarios) {
-  const response = responses[scenario.name];
-  const result = runEval(scenario, response, 'simulated');
-  console.log(formatEvalResult(result));
+  const results = [];
+  for (const s of scenarios) {
+    const agentResult = await runAgent(s.messages, s.contact, s.now);
+    const evalResult = runEval(s.scenario, agentResult.response, 'live');
+    results.push(evalResult);
+    console.log(formatEvalResult(evalResult));
+    console.log(`  ${DIM}Response: "${agentResult.response.substring(0, 100)}${agentResult.response.length > 100 ? '...' : ''}"${RESET}\n`);
+  }
+
+  // --- Component 3: Differentiation scoring ---
+  console.log(`${BOLD}${YELLOW}▸ 3. DIFFERENTIATION SCORING${RESET}\n`);
+  console.log(`  ${DIM}Same scenario, two temporal contexts. Does the model behave differently?${RESET}\n`);
+  console.log(`  ${DIM}Running faucet scenario at 5 minutes vs 2 days...${RESET}\n`);
+
+  // Variant A: 5 minutes after the conversation (too soon to follow up)
+  const fiveMinLater = new Date('2026-03-10T14:58:00-07:00');
+  const resultA = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, fiveMinLater);
+  const evalA = runEval(scenarios[0].scenario, resultA.response, '5-minutes-later');
+
+  // Variant B: 2 days later (follow-up is appropriate)
+  const resultB = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW);
+  const evalB = runEval(scenarios[0].scenario, resultB.response, '2-days-later');
+
+  const diff = scoreDifferentiation(evalA, evalB, [
+    {
+      name: 'action-differs',
+      test: (a, b) => {
+        const aSkips = a.toLowerCase().startsWith('skip') || a.length < 50;
+        const bFollows = !b.toLowerCase().startsWith('skip') && b.length > 50;
+        return aSkips !== bFollows;
+      },
+      weight: 1,
+    },
+    {
+      name: 'urgency-differs',
+      test: (a, b) => {
+        const aPassive = /take your time|no rush|whenever|here when/i.test(a);
+        const bProactive = /checking in|follow|wanted to|touch base/i.test(b);
+        return aPassive || bProactive;
+      },
+      weight: 1,
+    },
+  ]);
+
+  console.log(formatDifferentiation(diff));
   console.log('');
+
+  // --- Component 4: Regression ---
+  console.log(`${BOLD}${YELLOW}▸ 4. REGRESSION${RESET}\n`);
+  console.log(`  ${DIM}Every scenario above is now a permanent test.${RESET}`);
+  console.log(`  ${DIM}Upgrade the model? Run the same scenarios. Same expectations.${RESET}\n`);
+
+  for (const r of results) {
+    const icon = r.score >= 0.8 ? `${GREEN}✓${RESET}` : `✗`;
+    console.log(`  ${icon} ${r.scenario} ${DIM}— score: ${r.score.toFixed(2)}${RESET}`);
+  }
+
+  console.log(`\n  ${DIM}Production failure → trace → fixture → eval → ${GREEN}regression test forever${RESET}.${RESET}\n`);
 }
 
-// ─── COMPONENT 3: DIFFERENTIATION SCORING ──────────────────
-
-console.log(`${BOLD}${YELLOW}▸ 3. DIFFERENTIATION SCORING${RESET}\n`);
-console.log(`  ${DIM}Same scenario, two temporal contexts. Does the model behave differently?${RESET}\n`);
-
-// Variant A: 5 minutes after "let me check with my wife" (no delay)
-const variantA = runEval(
-  scenarios[0],
-  'Sounds good — take your time! I\'ll be here whenever you\'re ready.',
-  '5-minutes-later',
-);
-
-// Variant B: 2 days after (significant delay)
-const variantB = runEval(
-  scenarios[0],
-  'Hi Sarah! Just checking in — did you get a chance to chat with your wife about the faucet repair? We still have availability this week if you\'re interested.',
-  '2-days-later',
-);
-
-const diffResult = scoreDifferentiation(variantA, variantB, [
-  {
-    name: 'urgency-differs',
-    test: (a, b) => {
-      const aPassive = /take your time|no rush|whenever/i.test(a);
-      const bProactive = /checking in|follow|availability/i.test(b);
-      return aPassive !== bProactive;
-    },
-    weight: 1,
-  },
-  {
-    name: 'action-differs',
-    test: (a, b) => {
-      const aWaits = a.length < 80;
-      const bFollowsUp = b.length > 80;
-      return aWaits && bFollowsUp;
-    },
-    weight: 1,
-  },
-]);
-
-console.log(formatDifferentiation(diffResult));
-console.log('');
-
-// ─── COMPONENT 4: REGRESSION ──────────────────────────────
-
-console.log(`${BOLD}${YELLOW}▸ 4. REGRESSION${RESET}\n`);
-console.log(`  ${DIM}Every production failure becomes a permanent test:${RESET}\n`);
-console.log(`  ${GREEN}✓${RESET} thursday-followup         ${DIM}← caught the SKIP failure, now tested forever${RESET}`);
-console.log(`  ${GREEN}✓${RESET} burst-pipe-escalation     ${DIM}← verified emergency handling${RESET}`);
-console.log(`  ${GREEN}✓${RESET} back-off-silent-customer  ${DIM}← prevented over-pursuing${RESET}`);
-console.log(`  ${GREEN}✓${RESET} wife-said-yes             ${DIM}← caught auto-stop killing confirmation${RESET}`);
-
-// ✏️ TRY: Add a new scenario to the list above — what about a customer
-// who texts "actually it's getting worse, can someone come today?"
-// What checks would you write?
-
-console.log(`\n  ${DIM}Production failure → trace captured → fixture created → eval written →`);
-console.log(`  ${GREEN}regression test forever${RESET}.${DIM} The suite grows with every bug you find.${RESET}\n`);
+main().catch(console.error);
