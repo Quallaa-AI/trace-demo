@@ -1,9 +1,11 @@
 // Agent executor — runs a real conversation through Claude.
 //
 // Takes conversation history + temporal context, calls the model,
-// returns the response and any tool calls. Single-turn: the model
-// responds once, optionally calling tools.
+// returns the response and any tool calls. Multi-turn tool loop:
+// if the model calls tools, we execute them and send results back
+// so the model can produce a final text response (max 5 turns).
 
+import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { Message, ToolCall, Contact } from './types';
 import { annotateMessages, buildConversationTimingContext, buildCurrentTimeContext } from './temporal';
@@ -90,25 +92,40 @@ export async function runAgent(
 
   clearToolLog();
   const start = Date.now();
-
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1024,
-    system: fullSystem,
-    messages: claudeMessages,
-    tools: claudeTools,
-  });
-
-  const duration_ms = Date.now() - start;
-
-  // Extract text response and tool calls
-  let textResponse = '';
   const toolsCalled: ToolCall[] = [];
+  let textResponse = '';
+  let model = '';
+  const MAX_TURNS = 5;
 
-  for (const block of response.content) {
-    if (block.type === 'text') {
-      textResponse += block.text;
-    } else if (block.type === 'tool_use') {
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      system: fullSystem,
+      messages: claudeMessages,
+      tools: claudeTools,
+    });
+
+    model = response.model;
+
+    // Collect text and tool use blocks
+    const toolUseBlocks: Anthropic.ToolUseBlock[] = [];
+
+    for (const block of response.content) {
+      if (block.type === 'text') {
+        textResponse += block.text;
+      } else if (block.type === 'tool_use') {
+        toolUseBlocks.push(block);
+      }
+    }
+
+    // If no tool calls, we're done
+    if (toolUseBlocks.length === 0) break;
+
+    // Execute tools and build tool results for next turn
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+    for (const block of toolUseBlocks) {
       const tool = getTool(block.name);
       if (tool) {
         const result = tool.handler(block.input as Record<string, unknown>, contact);
@@ -117,15 +134,29 @@ export async function runAgent(
           input: block.input as Record<string, unknown>,
           result: result.message,
         });
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: result.message,
+        });
       }
     }
+
+    // Append assistant message + tool results for the next turn
+    claudeMessages.push({ role: 'assistant', content: response.content });
+    claudeMessages.push({ role: 'user', content: toolResults });
+
+    // If the model signaled end_turn (not tool_use), we're done
+    if (response.stop_reason === 'end_turn') break;
   }
+
+  const duration_ms = Date.now() - start;
 
   return {
     response: textResponse,
     tools_called: toolsCalled,
     duration_ms,
-    model: response.model,
+    model,
   };
 }
 
