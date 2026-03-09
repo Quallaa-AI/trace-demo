@@ -1,0 +1,26 @@
+{
+  "name": "trace-framework-demo",
+  "version": "1.0.0",
+  "description": "TRACE framework demo — temporal awareness masterclass",
+  "private": true,
+  "scripts": {
+    "demo:1": "npx tsx demos/1-temporal.ts",
+    "demo:2": "npx tsx demos/2-trust.ts",
+    "demo:3": "npx tsx demos/3-trace.ts",
+    "demo:4": "npx tsx demos/4-eval.ts",
+    "demo:5": "npx tsx demos/5-context.ts",
+    "demo:6": "npx tsx demos/6-enforcement.ts",
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.3"
+  }
+}
