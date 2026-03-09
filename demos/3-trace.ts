@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 // DEMO 3: Structured Traces
-// Presentation: Part 4 — Runtime Observability (R)
+// Presentation: Part 5 — Runtime Observability (R)
 //
 // Run: npm run demo:3
 //

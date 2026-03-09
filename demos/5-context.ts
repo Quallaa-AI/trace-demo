@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 // DEMO 5: Signal Framing (The Context Engineering Flywheel)
-// Presentation: Part 6 — Context Engineering (C)
+// Presentation: Part 7 — Context Engineering (C)
 //
 // Run: npm run demo:5
 //

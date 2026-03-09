@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 // DEMO 2: Trust Boundaries
-// Presentation: Part 3 — Trust Boundaries (T)
+// Presentation: Part 4 — Trust Boundaries (T)
 //
 // Run: npm run demo:2
 //

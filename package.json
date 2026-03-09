@@ -4,6 +4,7 @@
   "description": "TRACE framework demo — temporal awareness masterclass",
   "private": true,
   "scripts": {
+    "demo:0": "npx tsx demos/0-blindness.ts",
     "demo:1": "npx tsx demos/1-temporal.ts",
     "demo:2": "npx tsx demos/2-trust.ts",
     "demo:3": "npx tsx demos/3-trace.ts",

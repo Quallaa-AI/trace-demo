@@ -54,28 +54,35 @@ export async function runAgent(
   opts: {
     signalFormat?: 'passive' | 'directive';
     scenario?: string;
+    skipTemporalContext?: boolean;
   } = {},
 ): Promise<ExecutorResult> {
   const signalFormat = opts.signalFormat ?? 'passive';
+  const skipTemporal = opts.skipTemporalContext ?? false;
 
-  // Build the full system prompt with temporal context
-  const timeContext = buildCurrentTimeContext(now, contact.timezone);
-  const annotated = annotateMessages(messages, now);
-  const timingContext = buildConversationTimingContext(messages, now, signalFormat);
+  // Build the full system prompt — with or without temporal context
+  let fullSystem: string;
+  let conversationBlock: string;
 
-  const fullSystem = [
-    SYSTEM_PROMPT,
-    '',
-    timeContext,
-    '',
-    timingContext,
-  ].join('\n');
+  if (skipTemporal) {
+    // Blind mode: raw ISO timestamps, no timing context
+    fullSystem = SYSTEM_PROMPT;
+    conversationBlock = messages.map(m => {
+      const role = m.role === 'customer' ? 'Customer' : 'Agent';
+      return `[${m.timestamp}] ${role}: ${m.content}`;
+    }).join('\n');
+  } else {
+    const timeContext = buildCurrentTimeContext(now, contact.timezone);
+    const timingContext = buildConversationTimingContext(messages, now, signalFormat);
+    fullSystem = [SYSTEM_PROMPT, '', timeContext, '', timingContext].join('\n');
+    conversationBlock = annotateMessages(messages, now);
+  }
 
   // Convert conversation to Claude message format
   const claudeMessages: Anthropic.MessageParam[] = [
     {
       role: 'user',
-      content: `Here is the conversation history:\n\n${annotated}\n\nRespond to the customer's last message (or decide what to do next if you sent the last message). Keep your response SMS-length (under 300 characters). If you decide not to send a message, respond with just "SKIP" followed by your reasoning.`,
+      content: `Here is the conversation history:\n\n${conversationBlock}\n\nRespond to the customer's last message (or decide what to do next if you sent the last message). Keep your response SMS-length (under 300 characters). If you decide not to send a message, respond with just "SKIP" followed by your reasoning.`,
     },
   ];
 

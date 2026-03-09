@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 // DEMO 6: Enforcement Gates
-// Presentation: Part 7 — Enforcement (E)
+// Presentation: Part 8 — Enforcement (E)
 //
 // Run: npm run demo:6
 //

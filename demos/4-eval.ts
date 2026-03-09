@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 // DEMO 4: Adaptive Evals
-// Presentation: Part 5 — Adaptive Evals (A)
+// Presentation: Part 6 — Adaptive Evals (A)
 //
 // Run: npm run demo:4
 //

@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 // DEMO 1: What the Model Sees
-// Presentation: Part 2 — Why This Happens (temporal blindness)
+// Presentation: Part 7 — Context Engineering (C)
 //
 // Run: npm run demo:1
 //

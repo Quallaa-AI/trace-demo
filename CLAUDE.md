@@ -10,7 +10,7 @@ Uses the Anthropic SDK (`@anthropic-ai/sdk`) for agent interactions.
 
 ## Commands
 
-- **Run demos:** `npm run demo:1` through `npm run demo:6` (each runs a numbered demo via `tsx`)
+- **Run demos:** `npm run demo:0` through `npm run demo:6` (each runs a numbered demo via `tsx`)
 - **Run tests:** `npm test` (Jest with ts-jest, test root is `tests/`)
 - **Run a single test:** `npx jest tests/trust.test.ts`
 - **Type check:** `npm run typecheck` (runs `tsc --noEmit`)
@@ -28,6 +28,7 @@ The framework implements a layered approach to temporal awareness for conversati
 - **`enforcement.ts`** — Hard enforcement gates that are never model decisions: opt-out blocking, race condition guards, duplication caps. Pure functions with injectable `now` for testability.
 - **`trace.ts`** — Structured trace capture. Combines temporal context + annotated messages + agent response into queryable `TraceEntry` objects.
 - **`eval.ts`** — Eval runner with two modes: standard (check properties of a response) and paired differentiation (same scenario, two temporal contexts, score 0–1 on behavioral difference).
+- **`executor.ts`** — Agent executor. Runs conversations through Claude with temporal context injected into the system prompt. Multi-turn tool loop (max 5 turns) handles tool calls and feeds results back. Supports `skipTemporalContext` mode for demonstrating temporal blindness.
 
 ### Key Design Principles
 
@@ -37,7 +38,7 @@ The framework implements a layered approach to temporal awareness for conversati
 
 ### Demos (`demos/`)
 
-Numbered 1–6, each maps to a section of the presentation. Run with `npm run demo:N`. Some demos call the Anthropic API and require `ANTHROPIC_API_KEY` in `.env`.
+Numbered 0–6, each maps to a section of the presentation. Run with `npm run demo:N`. Demos 0, 3, 4, 5 call the Anthropic API and require `ANTHROPIC_API_KEY` in `.env`. Demos 1, 2, 6 are local-only.
 
 ### Tests (`tests/`)
 
