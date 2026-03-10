@@ -71,7 +71,8 @@ export async function runAgent(
   let conversationBlock: string;
 
   if (skipTemporal) {
-    // Blind mode: raw ISO timestamps, no timing context
+    // Blind mode: raw ISO timestamps, no timing context, no current time.
+    // The model sees timestamps but can't do the arithmetic.
     fullSystem = SYSTEM_PROMPT;
     conversationBlock = messages.map(m => {
       const role = m.role === 'customer' ? 'Customer' : 'Agent';

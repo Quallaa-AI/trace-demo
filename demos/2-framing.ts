@@ -8,15 +8,10 @@
 // went from 0.10 to 0.90 differentiation by rewording alone.
 //
 // Same temporal fact, two framings:
-//   Passive:   "Contact is waiting for your reply (1d)"
-//   Directive: "DELAYED RESPONSE: You are replying 1d after their last message"
+//   Passive:   "Contact is waiting for your reply (3h)"
+//   Directive: "DELAYED RESPONSE: You are replying 3h after their last message"
 //
 // Same data. Same model. The framing changes whether it acts on it.
-//
-// This is a Directional Expectation Test (Ribeiro et al., ACL 2020):
-// given a meaningful change in input, does the output change in the
-// expected direction? Research shows framing shifts of up to 18%
-// from simple prepended phrases (Merkelbach, 2025).
 // ══════════════════════════════════════════════════════════════
 
 import { runAgent } from '../src/executor';
@@ -34,15 +29,11 @@ const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
 
 // Sarah described her problem at 2:49 PM. The agent replies at 5:49 PM — 3 hours later.
-// A 3h gap in SMS is the sweet spot: long enough to notice, short enough to apologize for.
-// This matches the production experiment that found passive→directive went 0.10→0.90.
 const THREE_HOURS_LATER = new Date('2026-03-10T17:49:00-07:00');
 
 // Just the first exchange: agent's text-back and customer's problem description.
 // The customer asked a question and is waiting for a reply.
 const waitingForReply: Message[] = FAUCET_MESSAGES.slice(0, 2);
-
-const DELAY_REGEX = /sorry|apologi|delay|slow|getting back|late|patience|wait/i;
 
 const scenario: Scenario = {
   name: 'signal-framing-experiment',
@@ -51,12 +42,17 @@ const scenario: Scenario = {
   checks: [
     {
       name: 'acknowledges-delay',
-      test: (r) => DELAY_REGEX.test(r),
+      test: (r) => /sorry|apologi|delay|slow|getting back|late|patience|wait/i.test(r),
       detail_pass: 'Acknowledged the delay',
       detail_fail: 'No delay acknowledgment',
     },
   ],
 };
+
+const diffContext = `Same scenario: a customer described a leaky faucet 3 hours ago and is waiting for a reply. Two framings of the same temporal fact were used.
+Response A used passive framing: "Contact is waiting for your reply (3h)" — third-person observation.
+Response B used directive framing: "DELAYED RESPONSE: You are replying 3h after their last message" — second-person, labeled for salience.
+The question: did the directive framing cause the agent to behave differently in urgency, action taken, and tone (e.g., acknowledging the delay, apologizing, adjusting approach)?`;
 
 // Extract the SMS content from tool calls — the actual message sent,
 // not Claude's narration text.
@@ -84,7 +80,7 @@ async function main() {
   }
   console.log('');
 
-  console.log(`  ${BOLD}Directive framing (second-person awareness):${RESET}`);
+  console.log(`  ${BOLD}Directive framing (second-person, labeled):${RESET}`);
   for (const line of directive.split('\n')) {
     if (line.startsWith('DELAYED')) {
       console.log(`    ${GREEN}${line}${RESET}`);
@@ -117,34 +113,15 @@ async function main() {
   // --- Score differentiation ---
   console.log(`${BOLD}${YELLOW}▸ DIFFERENTIATION SCORE${RESET}\n`);
 
-  const diff = scoreDifferentiation(passiveEval, directiveEval, [
-    {
-      name: 'delay-acknowledgment',
-      test: (a, b) => {
-        const aAcknowledges = DELAY_REGEX.test(a);
-        const bAcknowledges = DELAY_REGEX.test(b);
-        return !aAcknowledges && bAcknowledges;
-      },
-      weight: 1,
-    },
-    {
-      name: 'tone-shift',
-      test: (a, b) => {
-        const bSofter = /sorry|apologi|patience|getting back/i.test(b);
-        const aDirect = !/sorry|apologi|patience|getting back/i.test(a);
-        return aDirect && bSofter;
-      },
-      weight: 1,
-    },
-  ]);
+  const diff = await scoreDifferentiation(passiveEval, directiveEval, diffContext);
 
   console.log(formatDifferentiation(diff));
 
   // --- The finding ---
   console.log(`\n${BOLD}${YELLOW}▸ THE FINDING${RESET}\n`);
   console.log(`  ${DIM}Same data. Same model. One signal reworded.${RESET}`);
-  console.log(`  ${RED}Passive:${RESET}   ${DIM}"Contact is waiting for your reply (3h)"${RESET}  ${DIM}→ observation${RESET}`);
-  console.log(`  ${GREEN}Directive:${RESET} ${DIM}"You are replying 3h after their last message"${RESET} ${DIM}→ awareness${RESET}`);
+  console.log(`  ${RED}Passive:${RESET}   ${DIM}"Contact is waiting for your reply (3h)"${RESET}`);
+  console.log(`  ${GREEN}Directive:${RESET} ${DIM}"DELAYED RESPONSE: You are replying 3h after their last message"${RESET}`);
   console.log(`\n  ${BOLD}Address the agent, not the contact.${RESET}`);
   console.log(`  ${DIM}Second-person framing creates awareness. Third-person creates observation.${RESET}`);
   console.log(`  ${DIM}Research confirms: up to 18% performance shift from framing alone.${RESET}`);

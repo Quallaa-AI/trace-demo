@@ -7,16 +7,15 @@
 // Runs both scenarios (faucet follow-up + burst pipe emergency)
 // through Claude twice: once WITHOUT temporal context, once WITH.
 //
-// Without context, the model has raw ISO timestamps it can't do
-// arithmetic on. Watch how it handles the faucet follow-up —
-// the burst pipe is easy (the message says "HELP"), but knowing
-// that Sarah has been silent for 42 hours requires subtraction
-// the model can't reliably do.
+// Without temporal context, the model has raw ISO timestamps but
+// no current time and no pre-computed durations. Watch how it
+// handles the faucet follow-up — the burst pipe is easy (the
+// message says "HELP"), but knowing that Sarah has been silent
+// for 42 hours requires temporal awareness the model doesn't have.
 // ══════════════════════════════════════════════════════════════
 
 import { runAgent } from '../src/executor';
-import { scoreDifferentiation, formatDifferentiation } from '../src/eval';
-import { runEval, Scenario } from '../src/eval';
+import { runEval, scoreDifferentiation, Scenario } from '../src/eval';
 import {
   FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW,
   BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW,
@@ -72,129 +71,99 @@ const burstScenario: Scenario = {
   ],
 };
 
-// ─── Differentiation judges ─────────────────────────────────
+// ─── Differentiation context for the LLM judge ──────────────
 
-const differentiators = [
-  {
-    name: 'urgency-differs',
-    test: (faucet: string, burst: string) => {
-      const burstUrgent = /emergency|urgent|flood|immediately|asap|right away/i.test(burst);
-      const faucetCalm = !/emergency|urgent|immediately|asap|right away/i.test(faucet);
-      return burstUrgent && faucetCalm;
-    },
-    weight: 1,
-  },
-  {
-    name: 'action-differs',
-    test: (faucet: string, burst: string) => {
-      const burstEscalates = /on-call|dispatch|send|someone|technician/i.test(burst);
-      const faucetGentle = /check|husband|faucet|follow|touch base|still interested/i.test(faucet);
-      return burstEscalates || faucetGentle;
-    },
-    weight: 1,
-  },
-  {
-    name: 'tone-differs',
-    test: (faucet: string, burst: string) => {
-      // Burst pipe should be notably longer/more action-oriented
-      // Faucet should be a casual check-in
-      const burstHasAction = burst.length > 80 && /!/.test(burst);
-      const faucetIsCalm = !/!.*!/.test(faucet); // not multiple exclamation marks
-      return burstHasAction && faucetIsCalm;
-    },
-    weight: 1,
-  },
-];
+const faucetDiffContext = `Same scenario: a customer said "let me check with my husband" about a leaky faucet repair 42 hours ago and never replied. It's now Thursday 9 AM.
+Response A was generated WITHOUT temporal context — the model had raw ISO timestamps but no current time and no pre-computed durations.
+Response B was generated WITH temporal context — the model saw "unanswered for 1d", "last message from contact: 1d ago", current time, etc.
+The question: did the temporal context cause the agent to behave differently in urgency, action taken, and tone?`;
 
 async function main() {
   console.log(`\n${BOLD}${CYAN}══ DEMO 0: Temporal Blindness ══${RESET}\n`);
 
-  // ─── Part 1: WITHOUT temporal context ─────────────────────
+  // ─── Run all four agent calls ──────────────────────────────
 
-  console.log(`${BOLD}${RED}▸ WITHOUT TEMPORAL CONTEXT${RESET}`);
-  console.log(`${DIM}  The model gets raw ISO timestamps. It can read them but can't`);
-  console.log(`  subtract them to know Sarah has been silent for 42 hours.${RESET}\n`);
+  console.log(`${BOLD}${YELLOW}▸ RUNNING SCENARIOS${RESET}`);
+  console.log(`${DIM}  Each scenario runs twice: once with raw timestamps (blind),`);
+  console.log(`  once with pre-computed timing facts (aware).${RESET}\n`);
 
-  console.log(`${DIM}  Running faucet scenario (Thursday 9 AM — 42h after last message)...${RESET}`);
+  console.log(`${DIM}  Running faucet (blind)...${RESET}`);
   const blindFaucet = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW, {
     skipTemporalContext: true,
   });
   const blindFaucetEval = runEval(faucetScenario, blindFaucet.response, 'blind');
 
-  console.log(`${DIM}  Running burst pipe scenario (Saturday 11:33 PM — 1 min after last message)...${RESET}\n`);
+  console.log(`${DIM}  Running faucet (aware)...${RESET}`);
+  const awareFaucet = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW, {
+    signalFraming: 'directive',
+  });
+  const awareFaucetEval = runEval(faucetScenario, awareFaucet.response, 'aware');
+
+  console.log(`${DIM}  Running burst pipe (blind)...${RESET}`);
   const blindBurst = await runAgent(BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW, {
     skipTemporalContext: true,
   });
   const blindBurstEval = runEval(burstScenario, blindBurst.response, 'blind');
 
-  console.log(`  ${BOLD}Faucet (blind):${RESET} "${blindFaucet.response.substring(0, 150)}${blindFaucet.response.length > 150 ? '...' : ''}"`);
+  console.log(`${DIM}  Running burst pipe (aware)...${RESET}\n`);
+  const awareBurst = await runAgent(BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW, {
+    signalFraming: 'directive',
+  });
+  const awareBurstEval = runEval(burstScenario, awareBurst.response, 'aware');
+
+  // ─── Faucet: blind vs aware ────────────────────────────────
+
+  console.log(`${BOLD}${RED}▸ FAUCET FOLLOW-UP${RESET}`);
+  console.log(`${DIM}  Sarah said "let me check with my husband" 42 hours ago. Never replied.${RESET}\n`);
+
+  console.log(`  ${BOLD}Blind:${RESET} "${blindFaucet.response.substring(0, 150)}${blindFaucet.response.length > 150 ? '...' : ''}"`);
   for (const check of blindFaucetEval.checks) {
     const icon = check.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
     console.log(`    ${icon} ${check.name}: ${DIM}${check.detail}${RESET}`);
   }
   console.log('');
 
-  console.log(`  ${BOLD}Burst pipe (blind):${RESET} "${blindBurst.response.substring(0, 150)}${blindBurst.response.length > 150 ? '...' : ''}"`);
-  for (const check of blindBurstEval.checks) {
-    const icon = check.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-    console.log(`    ${icon} ${check.name}: ${DIM}${check.detail}${RESET}`);
-  }
-  console.log('');
-
-  const blindDiff = scoreDifferentiation(blindFaucetEval, blindBurstEval, differentiators);
-
-  console.log(`  ${BOLD}Differentiation:${RESET} ${blindDiff.differentiation_score.toFixed(2)}`);
-  for (const line of blindDiff.explanation.split('\n')) {
-    console.log(`    ${DIM}${line}${RESET}`);
-  }
-
-  // ─── Part 2: WITH temporal context ────────────────────────
-
-  console.log(`\n${BOLD}${GREEN}▸ WITH TEMPORAL CONTEXT${RESET}`);
-  console.log(`${DIM}  Same scenarios, same model. Now the model gets pre-computed`);
-  console.log(`  timing facts: who's waiting, how long, burst detection.${RESET}\n`);
-
-  console.log(`${DIM}  Running faucet scenario with temporal context...${RESET}`);
-  const awarefaucet = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW, {
-    signalFraming: 'directive',
-  });
-  const awareFaucetEval = runEval(faucetScenario, awarefaucet.response, 'aware');
-
-  console.log(`${DIM}  Running burst pipe scenario with temporal context...${RESET}\n`);
-  const awareBurst = await runAgent(BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW, {
-    signalFraming: 'directive',
-  });
-  const awareBurstEval = runEval(burstScenario, awareBurst.response, 'aware');
-
-  console.log(`  ${BOLD}Faucet (aware):${RESET} "${awarefaucet.response.substring(0, 150)}${awarefaucet.response.length > 150 ? '...' : ''}"`);
+  console.log(`  ${BOLD}Aware:${RESET} "${awareFaucet.response.substring(0, 150)}${awareFaucet.response.length > 150 ? '...' : ''}"`);
   for (const check of awareFaucetEval.checks) {
     const icon = check.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
     console.log(`    ${icon} ${check.name}: ${DIM}${check.detail}${RESET}`);
   }
   console.log('');
 
-  console.log(`  ${BOLD}Burst pipe (aware):${RESET} "${awareBurst.response.substring(0, 150)}${awareBurst.response.length > 150 ? '...' : ''}"`);
-  for (const check of awareBurstEval.checks) {
+  console.log(`${DIM}  Scoring differentiation (LLM judge)...${RESET}`);
+  const faucetDiff = await scoreDifferentiation(blindFaucetEval, awareFaucetEval, faucetDiffContext);
+
+  console.log(`  ${BOLD}Differentiation:${RESET} ${faucetDiff.differentiation_score.toFixed(2)}`);
+  for (const line of faucetDiff.explanation.split('\n')) {
+    console.log(`    ${DIM}${line}${RESET}`);
+  }
+
+  // ─── Burst pipe: both handle it well ────────────────────────
+
+  console.log(`\n${BOLD}${GREEN}▸ BURST PIPE EMERGENCY${RESET}`);
+  console.log(`${DIM}  Mike texted "HELP my basement is flooding" at 11:32 PM Saturday.${RESET}\n`);
+
+  console.log(`  ${BOLD}Blind:${RESET} "${blindBurst.response.substring(0, 150)}${blindBurst.response.length > 150 ? '...' : ''}"`);
+  for (const check of blindBurstEval.checks) {
     const icon = check.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
     console.log(`    ${icon} ${check.name}: ${DIM}${check.detail}${RESET}`);
   }
   console.log('');
 
-  const awareDiff = scoreDifferentiation(awareFaucetEval, awareBurstEval, differentiators);
-
-  console.log(`  ${BOLD}Differentiation:${RESET} ${awareDiff.differentiation_score.toFixed(2)}`);
-  for (const line of awareDiff.explanation.split('\n')) {
-    console.log(`    ${DIM}${line}${RESET}`);
+  console.log(`  ${BOLD}Aware:${RESET} "${awareBurst.response.substring(0, 150)}${awareBurst.response.length > 150 ? '...' : ''}"`);
+  for (const check of awareBurstEval.checks) {
+    const icon = check.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+    console.log(`    ${icon} ${check.name}: ${DIM}${check.detail}${RESET}`);
   }
+  console.log(`\n  ${DIM}The urgency is in the words — temporal context isn't needed here.${RESET}`);
 
   // ─── The point ────────────────────────────────────────────
 
   console.log(`\n${BOLD}${CYAN}▸ THE POINT${RESET}\n`);
-  console.log(`  ${BOLD}Blind differentiation:  ${RED}${blindDiff.differentiation_score.toFixed(2)}${RESET}`);
-  console.log(`  ${BOLD}Aware differentiation:  ${GREEN}${awareDiff.differentiation_score.toFixed(2)}${RESET}\n`);
+  console.log(`  ${BOLD}Faucet differentiation (blind vs aware):  ${GREEN}${faucetDiff.differentiation_score.toFixed(2)}${RESET}\n`);
 
   console.log(`${DIM}  The burst pipe is easy — "HELP my basement is flooding" carries its`);
-  console.log(`  own urgency. The model handles it with or without temporal context.`);
+  console.log(`  own urgency. Temporal context doesn't change much.`);
   console.log(`  `);
   console.log(`  The faucet is where temporal blindness bites. Without pre-computed`);
   console.log(`  timing facts, the model can't tell that 42 hours of silence after`);

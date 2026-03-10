@@ -8,9 +8,7 @@
 //   3. The model interprets — tone, persistence, urgency, escalation decisions
 //
 // The code computes temporal state. The prompt presents it as facts.
-// The model decides what those facts mean. We never label a response
-// as "delayed" or a message pattern as a "burst" — those are judgments
-// the model should make from the facts.
+// The model decides what those facts mean.
 
 import { Message } from './types';
 
@@ -87,21 +85,18 @@ export function buildConversationTimingContext(
   // Response gap — who sent the last message and how long ago?
   const lastMsg = messages[messages.length - 1];
 
-  // Delayed response signal — framed based on signalFraming mode
+  // Response gap signal — same fact, two framings.
+  // Passive: third-person observation about the contact.
+  // Directive: second-person, labeled for salience.
   let delayedResponseLine = '';
 
   if (lastMsg.role === 'customer' && lastAgent) {
-    // Contact sent the last message — compute the gap
     const gapMs = now.getTime() - new Date(lastMsg.timestamp).getTime();
     const gapStr = formatDuration(gapMs);
 
     if (signalFraming === 'passive') {
-      // Third-person observation — states the fact about the contact
       lines.push(`Contact is waiting for your reply (${gapStr})`);
     } else {
-      // Second-person directive — addresses the agent directly.
-      // Same fact, but framed as self-awareness rather than observation.
-      // On a separate line with a label prefix for salience.
       delayedResponseLine = `DELAYED RESPONSE: You are replying ${gapStr} after their last message.`;
     }
   }

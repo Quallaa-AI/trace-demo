@@ -13,7 +13,11 @@
 // A response can pass every check and still ignore the temporal signal.
 // Paired differentiation closes that gap.
 
+import 'dotenv/config';
+import Anthropic from '@anthropic-ai/sdk';
 import { EvalResult, DifferentiationResult } from './types';
+
+const client = new Anthropic();
 
 export type EvalCheck = {
   name: string;
@@ -51,31 +55,71 @@ export function runEval(scenario: Scenario, response: string, variant = 'default
   };
 }
 
-// --- Paired differentiation scoring ---
+// --- Paired differentiation scoring (LLM-as-judge) ---
 // Same scenario run with two different temporal contexts.
-// The judge looks at whether the model's behavior changed meaningfully.
+// An LLM judge evaluates whether behavior changed meaningfully
+// across three dimensions: urgency, action, and tone.
 
-export function scoreDifferentiation(
+export async function scoreDifferentiation(
   resultA: EvalResult,
   resultB: EvalResult,
-  differentiators: { name: string; test: (a: string, b: string) => boolean; weight: number }[],
-): DifferentiationResult {
-  let totalWeight = 0;
-  let weightedScore = 0;
-  const details: string[] = [];
+  context: string,
+): Promise<DifferentiationResult> {
+  const judgePrompt = `You are an eval judge scoring whether two AI agent responses show meaningfully different BEHAVIOR — not just different wording.
 
-  for (const d of differentiators) {
-    const different = d.test(resultA.response, resultB.response);
-    totalWeight += d.weight;
-    if (different) {
-      weightedScore += d.weight;
-      details.push(`✓ ${d.name}: behavior differs`);
+${context}
+
+Response A (${resultA.variant}):
+"${resultA.response}"
+
+Response B (${resultB.variant}):
+"${resultB.response}"
+
+Score whether these responses differ meaningfully across three dimensions. Focus on behavioral differences that would matter to the customer, not surface-level variation in phrasing or formatting.
+
+- urgency: Does one response treat the situation as more time-sensitive than the other?
+- action: Does one response take a fundamentally different action (e.g., skip vs follow up, wait vs escalate)?
+- tone: Does one response strike a meaningfully different emotional register (e.g., casual vs concerned, patient vs urgent)?
+
+Two responses that take the same action with slightly different wording should score false. Two responses where one skips and one acts should score true.
+
+You MUST respond with exactly this JSON format and nothing else:
+{
+  "urgency": { "differs": true/false, "reason": "one sentence" },
+  "action": { "differs": true/false, "reason": "one sentence" },
+  "tone": { "differs": true/false, "reason": "one sentence" }
+}`;
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 256,
+    messages: [{ role: 'user', content: judgePrompt }],
+  });
+
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map(b => b.text)
+    .join('');
+
+  // Parse the JSON from the judge response
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const judgment = jsonMatch ? JSON.parse(jsonMatch[0]) : { urgency: { differs: false, reason: 'Parse error' }, action: { differs: false, reason: 'Parse error' }, tone: { differs: false, reason: 'Parse error' } };
+
+  const dimensions = ['urgency', 'action', 'tone'] as const;
+  const details: string[] = [];
+  let diffCount = 0;
+
+  for (const dim of dimensions) {
+    const d = judgment[dim];
+    if (d.differs) {
+      diffCount++;
+      details.push(`✓ ${dim}: ${d.reason}`);
     } else {
-      details.push(`✗ ${d.name}: no difference detected`);
+      details.push(`✗ ${dim}: ${d.reason}`);
     }
   }
 
-  const score = totalWeight > 0 ? weightedScore / totalWeight : 0;
+  const score = diffCount / dimensions.length;
 
   return {
     scenario: resultA.scenario,
