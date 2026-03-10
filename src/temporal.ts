@@ -53,11 +53,11 @@ export function annotateMessages(messages: Message[], now: Date): string {
 export function buildConversationTimingContext(
   messages: Message[],
   now: Date,
-  // Signal prominence — controls whether the response gap fact gets a
-  // separate, visually prominent line ('callout') or stays inline with
-  // the other timing facts. Demo 5 toggles this to show that how you
-  // present facts affects whether the model acts on them.
-  signalProminence: 'inline' | 'callout' = 'inline',
+  // Signal framing — same temporal fact, different sentence structure.
+  // 'passive': third-person observation ("Contact is waiting for your reply")
+  // 'directive': second-person awareness ("You are replying Xh after their last message")
+  // Demo 5 toggles this to show that framing changes whether the model acts.
+  signalFraming: 'passive' | 'directive' = 'passive',
 ): string {
   if (messages.length === 0) return '';
 
@@ -87,18 +87,23 @@ export function buildConversationTimingContext(
   // Response gap — who sent the last message and how long ago?
   const lastMsg = messages[messages.length - 1];
 
+  // Delayed response signal — framed based on signalFraming mode
+  let delayedResponseLine = '';
+
   if (lastMsg.role === 'customer' && lastAgent) {
     // Contact sent the last message — compute the gap
     const gapMs = now.getTime() - new Date(lastMsg.timestamp).getTime();
     const gapStr = formatDuration(gapMs);
 
-    if (signalProminence === 'callout') {
-      // Callout: same fact, but as a separate visually prominent line.
-      // Demo 5 shows this format gets acted on more often.
-      lines.push(`⚠ Response gap: ${gapStr} since contact's last message — no reply sent`);
+    if (signalFraming === 'passive') {
+      // Third-person observation — states the fact about the contact
+      lines.push(`Contact is waiting for your reply (${gapStr})`);
+    } else {
+      // Second-person directive — addresses the agent directly.
+      // Same fact, but framed as self-awareness rather than observation.
+      // On a separate line with a label prefix for salience.
+      delayedResponseLine = `DELAYED RESPONSE: You are replying ${gapStr} after their last message.`;
     }
-    // In both modes, "Last message from contact: Xd ago" above already
-    // states the fact. Callout mode adds an explicit, prominent repeat.
   }
 
   if (lastMsg.role === 'agent' && lastCustomer) {
@@ -131,7 +136,11 @@ export function buildConversationTimingContext(
   const spanMs = now.getTime() - first.getTime();
   lines.push(`Conversation spans ${formatDuration(spanMs)} (${messages.length} messages)`);
 
-  return `--- CONVERSATION TIMING ---\n[${lines.join('. ')}.]`;
+  const timingBlock = `--- CONVERSATION TIMING ---\n[${lines.join('. ')}.]`;
+  if (delayedResponseLine) {
+    return `${timingBlock}\n${delayedResponseLine}`;
+  }
+  return timingBlock;
 }
 
 // --- Current time injection ---

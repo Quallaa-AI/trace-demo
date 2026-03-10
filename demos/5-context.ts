@@ -1,23 +1,23 @@
 // ══════════════════════════════════════════════════════════════
-// DEMO 5: Signal Prominence (The Context Engineering Flywheel)
+// DEMO 5: Signal Framing (The Context Engineering Flywheel)
 // Presentation: Part 7 — Context Engineering (C)
 //
 // Run: npm run demo:5
 //
-// The centerpiece demo. Runs the SAME scenario through Claude twice,
-// with two levels of signal prominence:
+// Recreates a real production finding: the delayed-response signal
+// went from 0.10 to 0.90 differentiation by rewording alone.
 //
-//   Inline:  facts embedded in the timing block (easy to skim past)
-//   Callout: same facts, but the response gap gets a prominent ⚠ line
+// Same temporal fact, two framings:
+//   Passive:   "Contact is waiting for your reply (1d)"
+//   Directive: "DELAYED RESPONSE: You are replying 1d after their last message"
 //
-// Core principle: inject facts, not interpretations. Both framings
-// present the same temporal facts — the difference is prominence.
+// Same data. Same model. The framing changes whether it acts on it.
 // ══════════════════════════════════════════════════════════════
 
 import { runAgent } from '../src/executor';
 import { buildConversationTimingContext } from '../src/temporal';
 import { runEval, scoreDifferentiation, formatDifferentiation, Scenario } from '../src/eval';
-import { FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW } from '../src/conversation';
+import { FAUCET_MESSAGES, FAUCET_CUSTOMER } from '../src/conversation';
 import { Message } from '../src/types';
 
 const RESET = '\x1b[0m';
@@ -28,50 +28,61 @@ const YELLOW = '\x1b[33m';
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
 
-// The customer sent one more message Tuesday evening.
-// The agent is replying Thursday morning — over a day later.
-const messagesWithCustomerLast: Message[] = [
-  ...FAUCET_MESSAGES,
-  {
-    role: 'customer',
-    content: 'Actually, she said it\'s fine but can you come after 3pm?',
-    timestamp: '2026-03-10T18:30:00-07:00', // Tue 6:30 PM
-  },
-];
+// Sarah described her problem at 2:49 PM. The agent replies at 5:49 PM — 3 hours later.
+// A 3h gap in SMS is the sweet spot: long enough to notice, short enough to apologize for.
+// This matches the production experiment that found passive→directive went 0.10→0.90.
+const THREE_HOURS_LATER = new Date('2026-03-10T17:49:00-07:00');
+
+// Just the first exchange: agent's text-back and customer's problem description.
+// The customer asked a question and is waiting for a reply.
+const waitingForReply: Message[] = FAUCET_MESSAGES.slice(0, 2);
+
+const DELAY_REGEX = /sorry|apologi|delay|slow|getting back|late|patience|wait/i;
 
 const scenario: Scenario = {
-  name: 'signal-prominence-experiment',
-  description: 'Customer asked for an afternoon appointment Tuesday evening. Agent replies Thursday morning.',
-  expected_response: 'With callout prominence, the agent should acknowledge the response gap.',
+  name: 'signal-framing-experiment',
+  description: 'Same delayed response, passive vs directive framing.',
+  expected_response: 'Directive framing should trigger delay acknowledgment.',
   checks: [
     {
       name: 'acknowledges-delay',
-      test: (r) => /sorry|apologi|delayed|slow|took a while|getting back|late/i.test(r),
+      test: (r) => DELAY_REGEX.test(r),
       detail_pass: 'Acknowledged the delay',
       detail_fail: 'No delay acknowledgment',
     },
   ],
 };
 
+// Extract the SMS content from tool calls — the actual message sent,
+// not Claude's narration text.
+function extractSmsContent(result: { response: string; tools_called: { tool: string; input: Record<string, unknown> }[] }): string {
+  const sms = result.tools_called
+    .filter(t => t.tool === 'send_sms')
+    .map(t => t.input.message as string)
+    .join(' ');
+  return sms || result.response;
+}
+
 async function main() {
-  console.log(`\n${BOLD}${CYAN}══ DEMO 5: Signal Prominence ══${RESET}\n`);
+  console.log(`\n${BOLD}${CYAN}══ DEMO 5: Signal Framing ══${RESET}\n`);
 
-  // --- Show both presentations ---
-  console.log(`${BOLD}${YELLOW}▸ THE TWO PRESENTATIONS${RESET}\n`);
+  // --- Show both framings ---
+  console.log(`${BOLD}${YELLOW}▸ THE EXPERIMENT${RESET}\n`);
+  console.log(`  Same scenario, same data. One signal reworded.\n`);
 
-  const inline = buildConversationTimingContext(messagesWithCustomerLast, THURSDAY_NOW, 'inline');
-  const callout = buildConversationTimingContext(messagesWithCustomerLast, THURSDAY_NOW, 'callout');
+  const passive = buildConversationTimingContext(waitingForReply, THREE_HOURS_LATER, 'passive');
+  const directive = buildConversationTimingContext(waitingForReply, THREE_HOURS_LATER, 'directive');
 
-  console.log(`  ${BOLD}Inline (facts embedded):${RESET}`);
-  for (const line of inline.split('\n')) {
+  console.log(`  ${BOLD}Passive framing (third-person observation):${RESET}`);
+  for (const line of passive.split('\n')) {
     console.log(`    ${DIM}${line}${RESET}`);
   }
   console.log('');
 
-  console.log(`  ${BOLD}Callout (response gap highlighted):${RESET}`);
-  for (const line of callout.split('\n')) {
-    if (line.includes('⚠')) {
-      console.log(`  ${GREEN}  ${line}${RESET}`);
+  console.log(`  ${BOLD}Directive framing (second-person awareness):${RESET}`);
+  for (const line of directive.split('\n')) {
+    if (line.startsWith('DELAYED')) {
+      console.log(`    ${GREEN}${line}${RESET}`);
     } else {
       console.log(`    ${DIM}${line}${RESET}`);
     }
@@ -80,31 +91,33 @@ async function main() {
   // --- Run both through Claude ---
   console.log(`\n${BOLD}${YELLOW}▸ RUNNING BOTH THROUGH CLAUDE...${RESET}\n`);
 
-  console.log(`  ${DIM}Inline prominence...${RESET}`);
-  const inlineResult = await runAgent(
-    messagesWithCustomerLast, FAUCET_CUSTOMER, THURSDAY_NOW,
-    { signalFormat: 'inline' },
+  console.log(`  ${DIM}Passive framing...${RESET}`);
+  const passiveResult = await runAgent(
+    waitingForReply, FAUCET_CUSTOMER, THREE_HOURS_LATER,
+    { signalFraming: 'passive' },
   );
-  const inlineEval = runEval(scenario, inlineResult.response, 'inline');
-  console.log(`  Response: "${inlineResult.response.substring(0, 120)}${inlineResult.response.length > 120 ? '...' : ''}"\n`);
+  const passiveSms = extractSmsContent(passiveResult);
+  const passiveEval = runEval(scenario, passiveSms, 'passive');
+  console.log(`  SMS: "${passiveSms.substring(0, 120)}${passiveSms.length > 120 ? '...' : ''}"\n`);
 
-  console.log(`  ${DIM}Callout prominence...${RESET}`);
-  const calloutResult = await runAgent(
-    messagesWithCustomerLast, FAUCET_CUSTOMER, THURSDAY_NOW,
-    { signalFormat: 'callout' },
+  console.log(`  ${DIM}Directive framing...${RESET}`);
+  const directiveResult = await runAgent(
+    waitingForReply, FAUCET_CUSTOMER, THREE_HOURS_LATER,
+    { signalFraming: 'directive' },
   );
-  const calloutEval = runEval(scenario, calloutResult.response, 'callout');
-  console.log(`  Response: "${calloutResult.response.substring(0, 120)}${calloutResult.response.length > 120 ? '...' : ''}"\n`);
+  const directiveSms = extractSmsContent(directiveResult);
+  const directiveEval = runEval(scenario, directiveSms, 'directive');
+  console.log(`  SMS: "${directiveSms.substring(0, 120)}${directiveSms.length > 120 ? '...' : ''}"\n`);
 
   // --- Score differentiation ---
   console.log(`${BOLD}${YELLOW}▸ DIFFERENTIATION SCORE${RESET}\n`);
 
-  const diff = scoreDifferentiation(inlineEval, calloutEval, [
+  const diff = scoreDifferentiation(passiveEval, directiveEval, [
     {
       name: 'delay-acknowledgment',
       test: (a, b) => {
-        const aAcknowledges = /sorry|apologi|delayed|slow|late|getting back/i.test(a);
-        const bAcknowledges = /sorry|apologi|delayed|slow|late|getting back/i.test(b);
+        const aAcknowledges = DELAY_REGEX.test(a);
+        const bAcknowledges = DELAY_REGEX.test(b);
         return !aAcknowledges && bAcknowledges;
       },
       weight: 1,
@@ -112,9 +125,9 @@ async function main() {
     {
       name: 'tone-shift',
       test: (a, b) => {
-        const bMoreCareful = /no rush|take your time|whenever|sorry|apologi/i.test(b);
-        const aMoreDirect = !/sorry|apologi/i.test(a);
-        return aMoreDirect && bMoreCareful;
+        const bSofter = /sorry|apologi|patience|getting back/i.test(b);
+        const aDirect = !/sorry|apologi|patience|getting back/i.test(a);
+        return aDirect && bSofter;
       },
       weight: 1,
     },
@@ -122,15 +135,13 @@ async function main() {
 
   console.log(formatDifferentiation(diff));
 
-  // --- The flywheel ---
-  console.log(`\n${BOLD}${YELLOW}▸ THE FLYWHEEL${RESET}\n`);
-  console.log(`  ${BOLD}1.${RESET} Eval exposed the gap     ${DIM}— inline facts got skimmed past${RESET}`);
-  console.log(`  ${BOLD}2.${RESET} Identified the fix        ${DIM}— same fact, prominent callout${RESET}`);
-  console.log(`  ${BOLD}3.${RESET} Deployed it               ${DIM}— one line added to the timing block${RESET}`);
-  console.log(`  ${BOLD}4.${RESET} Eval confirmed it         ${DIM}— callout version acted on the gap${RESET}`);
-
-  console.log(`\n${DIM}  Same facts. Same model. Prominence changed.`);
-  console.log(`  That's context engineering — inject facts, not interpretations.${RESET}\n`);
+  // --- The finding ---
+  console.log(`\n${BOLD}${YELLOW}▸ THE FINDING${RESET}\n`);
+  console.log(`  ${DIM}Same data. Same model. One signal reworded.${RESET}`);
+  console.log(`  ${RED}Passive:${RESET}   ${DIM}"Contact is waiting for your reply (3h)"${RESET}  ${DIM}→ observation${RESET}`);
+  console.log(`  ${GREEN}Directive:${RESET} ${DIM}"You are replying 3h after their last message"${RESET} ${DIM}→ awareness${RESET}`);
+  console.log(`\n  ${BOLD}Address the agent, not the contact.${RESET}`);
+  console.log(`  ${DIM}Second-person framing creates awareness. Third-person creates observation.${RESET}\n`);
 }
 
 main().catch(console.error);

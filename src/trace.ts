@@ -17,9 +17,9 @@ export function captureTrace(
   agentResponse: string,
   toolsCalled: ToolCall[],
   durationMs: number,
-  signalProminence: 'inline' | 'callout' = 'inline',
+  signalFraming: 'passive' | 'directive' = 'passive',
 ): TraceEntry {
-  const timingContext = buildConversationTimingContext(messages, now, signalProminence);
+  const timingContext = buildConversationTimingContext(messages, now, signalFraming);
   const timeContext = buildCurrentTimeContext(now, contact.timezone);
   const annotated = annotateMessages(messages, now);
 

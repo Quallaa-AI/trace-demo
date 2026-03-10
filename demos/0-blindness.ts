@@ -156,13 +156,13 @@ async function main() {
 
   console.log(`${DIM}  Running faucet scenario with temporal context...${RESET}`);
   const awarefaucet = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW, {
-    signalFormat: 'callout',
+    signalFraming: 'directive',
   });
   const awareFaucetEval = runEval(faucetScenario, awarefaucet.response, 'aware');
 
   console.log(`${DIM}  Running burst pipe scenario with temporal context...${RESET}\n`);
   const awareBurst = await runAgent(BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW, {
-    signalFormat: 'callout',
+    signalFraming: 'directive',
   });
   const awareBurstEval = runEval(burstScenario, awareBurst.response, 'aware');
 
