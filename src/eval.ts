@@ -1,15 +1,17 @@
 // Adaptive eval runner — automated judgment on agent behavior.
 //
-// Two types of evals:
-//   1. Standard: Run a scenario, check properties of the response.
-//      "Did the agent follow up?" "Did it escalate?" "Was the tone right?"
+// Two layers:
+//   1. Standard evals: Regex judges that check facts about a response.
+//      "Did it mention the faucet?" "No aggressive language?" "Under 300 chars?"
+//      Fast, deterministic. They tell you the response is acceptable.
 //
 //   2. Paired differentiation: Same scenario, two temporal contexts.
-//      A judge scores 0–1 on whether the model behaved differently.
-//      This tests whether a specific signal actually changes behavior.
+//      Score 0–1 on whether behavior actually changes.
+//      This is the adaptive eval — it tests whether context engineering is working.
 //
-// The eval suite is the laboratory. Change a signal, run the eval,
-// measure the effect.
+// Standard evals can't tell you if the model is responding to context.
+// A response can pass every check and still ignore the temporal signal.
+// Paired differentiation closes that gap.
 
 import { EvalResult, DifferentiationResult } from './types';
 
