@@ -1,9 +1,10 @@
 // Tools — the four tools that give the agent temporal agency.
 // Each tool is a trust decision: what can the agent do on its own?
 //
-// Trust boundaries are built into the handlers, not bolted on after.
-// The boundaries define the contract: what the agent can do without
-// human approval, and where the limits are.
+// Trust (T) is the architecture: tools as capabilities, handlers as contracts.
+// Inside each handler, some checks are enforcement gates (E) — always wrong,
+// context-independent — and some are quality gates — good practice.
+// Enforcement is a subset of trust, not a separate system.
 
 import { Contact } from './types';
 
@@ -40,7 +41,7 @@ export const TOOLS: ToolDefinition[] = [
     handler: (input, contact) => {
       const message = String(input.message || '');
 
-      // Trust boundary: opt-out check (enforcement — never a model decision)
+      // Enforcement gate: opt-out — legal fines, always wrong
       if (contact.opted_out) {
         return logAndReturn('send_sms', input, {
           success: false,
@@ -48,7 +49,7 @@ export const TOOLS: ToolDefinition[] = [
         });
       }
 
-      // Trust boundary: message length cap
+      // Quality gate: message length cap
       if (message.length > 480) {
         return logAndReturn('send_sms', input, {
           success: false,
@@ -56,7 +57,7 @@ export const TOOLS: ToolDefinition[] = [
         });
       }
 
-      // Trust boundary: empty message guard
+      // Quality gate: empty message guard
       if (message.trim().length === 0) {
         return logAndReturn('send_sms', input, {
           success: false,
@@ -78,7 +79,7 @@ export const TOOLS: ToolDefinition[] = [
       const scheduledFor = String(input.scheduled_for || '');
       const reason = String(input.reason || '');
 
-      // Trust boundary: opt-out check
+      // Enforcement gate: opt-out — legal fines, always wrong
       if (contact.opted_out) {
         return logAndReturn('schedule_followup', input, {
           success: false,
@@ -86,7 +87,7 @@ export const TOOLS: ToolDefinition[] = [
         });
       }
 
-      // Trust boundary: must have a reason
+      // Quality gate: must have a reason
       if (!reason.trim()) {
         return logAndReturn('schedule_followup', input, {
           success: false,
@@ -94,7 +95,7 @@ export const TOOLS: ToolDefinition[] = [
         });
       }
 
-      // Trust boundary: max 5 active follow-ups per contact
+      // Enforcement gate: max 5 active follow-ups (duplication cap)
       const activeCount = toolLog.filter(
         e => e.tool === 'schedule_followup' && e.result.success
       ).length;

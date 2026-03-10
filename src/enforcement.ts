@@ -1,12 +1,13 @@
-// Enforcement gates — rules that are never model decisions.
+// Enforcement gates (E) — the subset of trust boundaries that are never model decisions.
 //
-// The test for whether something belongs in enforcement:
-// Is the consequence of violating this rule legal, financial, or
-// trust-destroying in a way that's context-independent?
+// Trust (T) is the architecture: tools as capabilities, handlers as contracts.
+// Enforcement (E) is the subset of rules inside those handlers where the
+// consequence is always wrong, regardless of context:
 //
-// - Opt-out violations carry per-text fines regardless of context → enforcement
-// - "Follow-up after reply is always wrong" is context-dependent → interpretation (model decides)
-// - Race conditions cause duplicate messages regardless of context → enforcement
+// - Opt-out violations → $500–$1,500 per-text fines → enforcement
+// - Race conditions → duplicate messages → enforcement
+// - Duplication caps → runaway scheduling → enforcement
+// - "Should I follow up after a reply?" → context-dependent → model decides
 //
 // Everything here is a pure function with injectable `now` for testability.
 
