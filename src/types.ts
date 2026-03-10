@@ -20,18 +20,10 @@ export type ToolCall = {
   result: string;
 };
 
-export type EvalResult = {
-  scenario: string;
-  variant: string;
-  response: string;
-  checks: { name: string; passed: boolean; detail: string }[];
-  score: number;
-};
-
 export type DifferentiationResult = {
   scenario: string;
-  variant_a: EvalResult;
-  variant_b: EvalResult;
   differentiation_score: number; // 0 = identical behavior, 1 = fully differentiated
   explanation: string;
+  response_a: string;
+  response_b: string;
 };

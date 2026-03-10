@@ -4,7 +4,6 @@ import { Contact } from '../src/types';
 
 const sendSms = TOOLS.find(t => t.name === 'send_sms')!;
 const schedule = TOOLS.find(t => t.name === 'schedule_followup')!;
-const checkSchedule = TOOLS.find(t => t.name === 'check_schedule')!;
 const cancelEvent = TOOLS.find(t => t.name === 'cancel_event')!;
 
 beforeEach(() => clearToolLog());

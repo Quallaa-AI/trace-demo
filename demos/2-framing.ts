@@ -16,7 +16,7 @@
 
 import { runAgent } from '../src/executor';
 import { buildConversationTimingContext } from '../src/temporal';
-import { runEval, scoreDifferentiation, formatDifferentiation, Scenario } from '../src/eval';
+import { scoreDifferentiation, formatDifferentiation } from '../src/eval';
 import { FAUCET_MESSAGES, FAUCET_CUSTOMER } from '../src/conversation';
 import { Message } from '../src/types';
 
@@ -26,7 +26,6 @@ const DIM = '\x1b[2m';
 const CYAN = '\x1b[36m';
 const YELLOW = '\x1b[33m';
 const GREEN = '\x1b[32m';
-const RED = '\x1b[31m';
 
 // Sarah described her problem at 2:49 PM. The agent replies at 5:49 PM — 3 hours later.
 const THREE_HOURS_LATER = new Date('2026-03-10T17:49:00-07:00');
@@ -34,20 +33,6 @@ const THREE_HOURS_LATER = new Date('2026-03-10T17:49:00-07:00');
 // Just the first exchange: agent's text-back and customer's problem description.
 // The customer asked a question and is waiting for a reply.
 const waitingForReply: Message[] = FAUCET_MESSAGES.slice(0, 2);
-
-const scenario: Scenario = {
-  name: 'signal-framing-experiment',
-  description: 'Same delayed response, passive vs directive framing.',
-  expected_response: 'Directive framing should trigger delay acknowledgment.',
-  checks: [
-    {
-      name: 'acknowledges-delay',
-      test: (r) => /sorry|apologi|delay|slow|getting back|late|patience|wait/i.test(r),
-      detail_pass: 'Acknowledged the delay',
-      detail_fail: 'No delay acknowledgment',
-    },
-  ],
-};
 
 const diffContext = `Same scenario: a customer described a leaky faucet 3 hours ago and is waiting for a reply. Two framings of the same temporal fact were used.
 Response A used passive framing: "Contact is waiting for your reply (3h)" — third-person observation.
@@ -98,7 +83,6 @@ async function main() {
     { signalFraming: 'passive' },
   );
   const passiveSms = extractSmsContent(passiveResult);
-  const passiveEval = runEval(scenario, passiveSms, 'passive');
   console.log(`  SMS: "${passiveSms.substring(0, 120)}${passiveSms.length > 120 ? '...' : ''}"\n`);
 
   console.log(`  ${DIM}Directive framing...${RESET}`);
@@ -107,20 +91,24 @@ async function main() {
     { signalFraming: 'directive' },
   );
   const directiveSms = extractSmsContent(directiveResult);
-  const directiveEval = runEval(scenario, directiveSms, 'directive');
   console.log(`  SMS: "${directiveSms.substring(0, 120)}${directiveSms.length > 120 ? '...' : ''}"\n`);
 
   // --- Score differentiation ---
   console.log(`${BOLD}${YELLOW}▸ DIFFERENTIATION SCORE${RESET}\n`);
 
-  const diff = await scoreDifferentiation(passiveEval, directiveEval, diffContext);
+  const diff = await scoreDifferentiation(
+    'signal-framing-experiment',
+    passiveSms, 'passive',
+    directiveSms, 'directive',
+    diffContext,
+  );
 
   console.log(formatDifferentiation(diff));
 
   // --- The finding ---
   console.log(`\n${BOLD}${YELLOW}▸ THE FINDING${RESET}\n`);
   console.log(`  ${DIM}Same data. Same model. One signal reworded.${RESET}`);
-  console.log(`  ${RED}Passive:${RESET}   ${DIM}"Contact is waiting for your reply (3h)"${RESET}`);
+  console.log(`  \x1b[31mPassive:\x1b[0m   ${DIM}"Contact is waiting for your reply (3h)"${RESET}`);
   console.log(`  ${GREEN}Directive:${RESET} ${DIM}"DELAYED RESPONSE: You are replying 3h after their last message"${RESET}`);
   console.log(`\n  ${BOLD}Address the agent, not the contact.${RESET}`);
   console.log(`  ${DIM}Second-person framing creates awareness. Third-person creates observation.${RESET}`);

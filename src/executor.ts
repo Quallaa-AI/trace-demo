@@ -15,7 +15,7 @@ import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { Message, ToolCall, Contact } from './types';
 import { annotateMessages, buildConversationTimingContext, buildCurrentTimeContext } from './temporal';
-import { TOOLS, getTool, clearToolLog, toolLog } from './tools';
+import { TOOLS, getTool, clearToolLog } from './tools';
 
 const client = new Anthropic();
 
