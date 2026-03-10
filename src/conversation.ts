@@ -31,7 +31,7 @@ export const FAUCET_MESSAGES: Message[] = [
   },
   {
     role: 'customer',
-    content: 'Let me check with my wife and get back to you.',
+    content: 'Let me check with my husband and get back to you.',
     timestamp: '2026-03-10T14:52:00-07:00', // Tue 2:52 PM
   },
   {

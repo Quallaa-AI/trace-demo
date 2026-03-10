@@ -65,7 +65,7 @@ console.log(`  ${RED}✗${RESET} schedule_followup (no reason): ${result.message
 // Schedule with reason
 clearToolLog();
 result = schedule.handler(
-  { scheduled_for: '2026-03-11T09:00:00', reason: 'Check if wife approved the faucet repair' },
+  { scheduled_for: '2026-03-11T09:00:00', reason: 'Check if husband approved the faucet repair' },
   FAUCET_CUSTOMER,
 );
 console.log(`  ${GREEN}✓${RESET} schedule_followup (with reason): ${result.message}`);

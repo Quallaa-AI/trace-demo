@@ -52,7 +52,7 @@ console.log('');
 
 const timing = buildConversationTimingContext(FAUCET_MESSAGES, NOW);
 for (const line of timing.split('\n')) {
-  if (line.includes('DELAYED') || line.includes('BURST') || line.includes('unanswered')) {
+  if (line.includes('⚠') || line.includes('messages from contact in last') || line.includes('unanswered')) {
     console.log(`  ${RED}${line}${RESET}`);
   } else {
     console.log(`  ${BOLD}${line}${RESET}`);
@@ -69,6 +69,6 @@ console.log(`  facts it can reason about. No timestamp parsing, no subtraction.$
 // --- The point ---
 if (NOW.getTime() === THURSDAY_NOW.getTime()) {
   console.log(`${BOLD}${RED}  ⚠ Notice: "Your last message is unanswered (1d)" — the customer`);
-  console.log(`  went silent after "let me check with my wife." It's been over a day.`);
+  console.log(`  went silent after "let me check with my husband." It's been over a day.`);
   console.log(`  The model now has a fact it can act on.${RESET}\n`);
 }

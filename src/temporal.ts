@@ -2,10 +2,15 @@
 // timing without doing arithmetic. This is the core fix for temporal blindness:
 // convert temporal reasoning problems into state reasoning problems.
 //
-// Three-part contract:
+// Core principle: inject facts, not interpretations.
 //   1. JavaScript computes — elapsed durations, intervals, waiting states
-//   2. The prompt presents — human-readable relative durations, not raw timestamps
+//   2. The prompt presents — pre-computed facts, not raw timestamps
 //   3. The model interprets — tone, persistence, urgency, escalation decisions
+//
+// The code computes temporal state. The prompt presents it as facts.
+// The model decides what those facts mean. We never label a response
+// as "delayed" or a message pattern as a "burst" — those are judgments
+// the model should make from the facts.
 
 import { Message } from './types';
 
@@ -48,10 +53,11 @@ export function annotateMessages(messages: Message[], now: Date): string {
 export function buildConversationTimingContext(
   messages: Message[],
   now: Date,
-  // ✏️ SIGNAL FRAMING — this controls how the "delayed response" signal reads.
-  // Default: passive framing. During the demo, change this to directive framing
-  // and watch the differentiation score jump.
-  waitingSignalFormat: 'passive' | 'directive' = 'passive',
+  // Signal prominence — controls whether the response gap fact gets a
+  // separate, visually prominent line ('callout') or stays inline with
+  // the other timing facts. Demo 5 toggles this to show that how you
+  // present facts affects whether the model acts on them.
+  signalProminence: 'inline' | 'callout' = 'inline',
 ): string {
   if (messages.length === 0) return '';
 
@@ -78,23 +84,21 @@ export function buildConversationTimingContext(
     lines.push(`${unansweredCount} message${unansweredCount > 1 ? 's' : ''} from you since their last reply`);
   }
 
-  // Who's waiting? This is the key signal.
+  // Response gap — who sent the last message and how long ago?
   const lastMsg = messages[messages.length - 1];
 
   if (lastMsg.role === 'customer' && lastAgent) {
-    // Contact sent the last message — agent is late replying
-    const delayMs = now.getTime() - new Date(lastMsg.timestamp).getTime();
-    const delayStr = formatDuration(delayMs);
+    // Contact sent the last message — compute the gap
+    const gapMs = now.getTime() - new Date(lastMsg.timestamp).getTime();
+    const gapStr = formatDuration(gapMs);
 
-    if (waitingSignalFormat === 'directive') {
-      // Directive framing: addresses the agent directly.
-      // Scored 0.90 differentiation in paired evals.
-      lines.push(`DELAYED RESPONSE: You are replying ${delayStr} after their last message`);
-    } else {
-      // Passive framing: describes the contact's state.
-      // Scored 0.10 differentiation — the model ignores it.
-      lines.push(`Contact is waiting for your reply (${delayStr})`);
+    if (signalProminence === 'callout') {
+      // Callout: same fact, but as a separate visually prominent line.
+      // Demo 5 shows this format gets acted on more often.
+      lines.push(`⚠ Response gap: ${gapStr} since contact's last message — no reply sent`);
     }
+    // In both modes, "Last message from contact: Xd ago" above already
+    // states the fact. Callout mode adds an explicit, prominent repeat.
   }
 
   if (lastMsg.role === 'agent' && lastCustomer) {
@@ -114,12 +118,12 @@ export function buildConversationTimingContext(
     }
   }
 
-  // Burst detection
+  // Message frequency — let the model decide what the pattern means
   const recentCustomer = messages.filter(m =>
     m.role === 'customer' && (now.getTime() - new Date(m.timestamp).getTime()) < 600_000
   );
   if (recentCustomer.length >= 3) {
-    lines.push(`BURST: ${recentCustomer.length} messages from contact in last 10 minutes`);
+    lines.push(`${recentCustomer.length} messages from contact in last 10 minutes`);
   }
 
   // Conversation span

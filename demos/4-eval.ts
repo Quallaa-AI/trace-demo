@@ -35,7 +35,7 @@ const scenarios: {
   {
     scenario: {
       name: 'thursday-followup',
-      description: 'Customer said "let me check with my wife" on Tuesday. It\'s Thursday morning.',
+      description: 'Customer said "let me check with my husband" on Tuesday. It\'s Thursday morning.',
       expected_response: 'Agent should follow up — a gentle check-in is appropriate after 42 hours.',
       checks: [
         {
@@ -46,7 +46,7 @@ const scenarios: {
         },
         {
           name: 'references-conversation',
-          test: (r) => /wife|faucet|kitchen|plumb/i.test(r),
+          test: (r) => /husband|faucet|kitchen|plumb/i.test(r),
           detail_pass: 'References the actual conversation',
           detail_fail: 'Generic message, no conversation context',
         },
@@ -109,7 +109,7 @@ const scenarios: {
     messages: [
       ...FAUCET_MESSAGES,
       // Two unanswered follow-ups:
-      { role: 'agent' as const, content: 'Hi Sarah! Just checking in — did you get a chance to talk with your wife about the faucet repair?', timestamp: '2026-03-11T09:00:00-07:00' },
+      { role: 'agent' as const, content: 'Hi Sarah! Just checking in — did you get a chance to talk with your husband about the faucet repair?', timestamp: '2026-03-11T09:00:00-07:00' },
       { role: 'agent' as const, content: 'Hi Sarah, just wanted to follow up one more time on the faucet. We have openings this week if you\'re still interested!', timestamp: '2026-03-13T09:00:00-07:00' },
     ],
     contact: FAUCET_CUSTOMER,
@@ -117,8 +117,8 @@ const scenarios: {
   },
   {
     scenario: {
-      name: 'wife-said-yes',
-      description: 'Customer texts "my wife said yes! Can you come Monday?"',
+      name: 'husband-said-yes',
+      description: 'Customer texts "my husband said yes! Can you come Monday?"',
       expected_response: 'Agent should confirm and propose times for Monday.',
       checks: [
         {
@@ -137,7 +137,7 @@ const scenarios: {
     },
     messages: [
       ...FAUCET_MESSAGES,
-      { role: 'customer' as const, content: 'My wife said yes! Can you come Monday?', timestamp: '2026-03-12T15:00:00-07:00' },
+      { role: 'customer' as const, content: 'My husband said yes! Can you come Monday?', timestamp: '2026-03-12T15:00:00-07:00' },
     ],
     contact: FAUCET_CUSTOMER,
     now: new Date('2026-03-12T15:01:00-07:00'),

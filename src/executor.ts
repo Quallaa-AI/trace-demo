@@ -52,12 +52,12 @@ export async function runAgent(
   contact: Contact,
   now: Date,
   opts: {
-    signalFormat?: 'passive' | 'directive';
+    signalFormat?: 'inline' | 'callout';
     scenario?: string;
     skipTemporalContext?: boolean;
   } = {},
 ): Promise<ExecutorResult> {
-  const signalFormat = opts.signalFormat ?? 'passive';
+  const signalFormat = opts.signalFormat ?? 'inline';
   const skipTemporal = opts.skipTemporalContext ?? false;
 
   // Build the full system prompt — with or without temporal context

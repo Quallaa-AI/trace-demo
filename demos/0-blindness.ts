@@ -34,7 +34,7 @@ const RED = '\x1b[31m';
 
 const faucetScenario: Scenario = {
   name: 'faucet-followup',
-  description: 'Customer said "let me check with my wife" 42 hours ago. Never replied.',
+  description: 'Customer said "let me check with my husband" 42 hours ago. Never replied.',
   expected_response: 'Agent should follow up — reference the faucet, gentle tone.',
   checks: [
     {
@@ -45,7 +45,7 @@ const faucetScenario: Scenario = {
     },
     {
       name: 'references-conversation',
-      test: (r) => /wife|faucet|kitchen|plumb|leak|repair/i.test(r),
+      test: (r) => /husband|faucet|kitchen|plumb|leak|repair/i.test(r),
       detail_pass: 'References the actual conversation',
       detail_fail: 'Generic or no reference to prior discussion',
     },
@@ -88,7 +88,7 @@ const differentiators = [
     name: 'action-differs',
     test: (faucet: string, burst: string) => {
       const burstEscalates = /on-call|dispatch|send|someone|technician/i.test(burst);
-      const faucetGentle = /check|wife|faucet|follow|touch base|still interested/i.test(faucet);
+      const faucetGentle = /check|husband|faucet|follow|touch base|still interested/i.test(faucet);
       return burstEscalates || faucetGentle;
     },
     weight: 1,
@@ -156,13 +156,13 @@ async function main() {
 
   console.log(`${DIM}  Running faucet scenario with temporal context...${RESET}`);
   const awarefaucet = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW, {
-    signalFormat: 'directive',
+    signalFormat: 'callout',
   });
   const awareFaucetEval = runEval(faucetScenario, awarefaucet.response, 'aware');
 
   console.log(`${DIM}  Running burst pipe scenario with temporal context...${RESET}\n`);
   const awareBurst = await runAgent(BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW, {
-    signalFormat: 'directive',
+    signalFormat: 'callout',
   });
   const awareBurstEval = runEval(burstScenario, awareBurst.response, 'aware');
 
@@ -198,7 +198,7 @@ async function main() {
   console.log(`  `);
   console.log(`  The faucet is where temporal blindness bites. Without pre-computed`);
   console.log(`  timing facts, the model can't tell that 42 hours of silence after`);
-  console.log(`  "let me check with my wife" means it's time to follow up.`);
+  console.log(`  "let me check with my husband" means it's time to follow up.`);
   console.log(`  `);
   console.log(`  Same model. Same data. The only difference: whether temporal`);
   console.log(`  relationships are pre-computed as facts the model can read.${RESET}\n`);

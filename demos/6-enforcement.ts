@@ -117,7 +117,7 @@ console.log(`    • Race guard → block             ${DIM}duplicate messages r
 console.log(`    • Duplication cap → block         ${DIM}runaway scheduling${RESET}`);
 console.log('');
 console.log(`  ${GREEN}Interpretation (model decides):${RESET}`);
-console.log(`    • Follow up after reply?          ${DIM}"my wife said yes" ≠ "ok thanks"${RESET}`);
+console.log(`    • Follow up after reply?          ${DIM}"my husband said yes" ≠ "ok thanks"${RESET}`);
 console.log(`    • How persistent to be?           ${DIM}depends on conversation context${RESET}`);
 console.log(`    • What tone to use?               ${DIM}depends on elapsed time and urgency${RESET}`);
 

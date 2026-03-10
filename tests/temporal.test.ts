@@ -54,25 +54,27 @@ describe('buildConversationTimingContext', () => {
     expect(result).toContain('unanswered');
   });
 
-  test('passive framing uses "Contact is waiting"', () => {
-    // Add a customer message at the end to trigger the waiting signal
+  test('inline prominence omits response gap callout', () => {
     const withCustomerLast = [...FAUCET_MESSAGES, {
       role: 'customer' as const,
       content: 'Actually, I changed my mind',
       timestamp: '2026-03-10T15:00:00-07:00',
     }];
-    const result = buildConversationTimingContext(withCustomerLast, THURSDAY_NOW, 'passive');
-    expect(result).toContain('Contact is waiting');
+    const result = buildConversationTimingContext(withCustomerLast, THURSDAY_NOW, 'inline');
+    expect(result).not.toContain('⚠');
+    // The fact is still present via "Last message from contact"
+    expect(result).toContain('Last message from contact');
   });
 
-  test('directive framing uses "DELAYED RESPONSE"', () => {
+  test('callout prominence adds ⚠ response gap line', () => {
     const withCustomerLast = [...FAUCET_MESSAGES, {
       role: 'customer' as const,
       content: 'Actually, I changed my mind',
       timestamp: '2026-03-10T15:00:00-07:00',
     }];
-    const result = buildConversationTimingContext(withCustomerLast, THURSDAY_NOW, 'directive');
-    expect(result).toContain('DELAYED RESPONSE');
+    const result = buildConversationTimingContext(withCustomerLast, THURSDAY_NOW, 'callout');
+    expect(result).toContain('⚠ Response gap');
+    expect(result).toContain('no reply sent');
   });
 
   test('returns empty string for no messages', () => {

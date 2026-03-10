@@ -17,9 +17,9 @@ export function captureTrace(
   agentResponse: string,
   toolsCalled: ToolCall[],
   durationMs: number,
-  signalFormat: 'passive' | 'directive' = 'passive',
+  signalProminence: 'inline' | 'callout' = 'inline',
 ): TraceEntry {
-  const timingContext = buildConversationTimingContext(messages, now, signalFormat);
+  const timingContext = buildConversationTimingContext(messages, now, signalProminence);
   const timeContext = buildCurrentTimeContext(now, contact.timezone);
   const annotated = annotateMessages(messages, now);
 
@@ -55,7 +55,7 @@ export function formatTrace(trace: TraceEntry): string {
   for (const line of trace.model_saw.split('\n')) {
     if (line.startsWith('---')) {
       lines.push(`  ${BOLD}${line}${RESET}`);
-    } else if (line.includes('DELAYED RESPONSE') || line.includes('BURST')) {
+    } else if (line.includes('⚠') || line.includes('messages from contact in last')) {
       lines.push(`  ${RED}${line}${RESET}`);
     } else if (line.startsWith('[')) {
       lines.push(`  ${DIM}${line}${RESET}`);
