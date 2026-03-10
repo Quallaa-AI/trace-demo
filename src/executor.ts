@@ -4,6 +4,12 @@
 // returns the response and any tool calls. Multi-turn tool loop:
 // if the model calls tools, we execute them and send results back
 // so the model can produce a final text response (max 5 turns).
+//
+// Note: The multi-turn tool loop below IS scaffolding — the valid kind.
+// It extends what the model can do (call tools, gather results, act on them)
+// without replacing its judgment about what to do. The anti-pattern is
+// scaffolding that overrides context-dependent decisions (fixed cadences,
+// exponential back-off for customer follow-ups, etc.).
 
 import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';

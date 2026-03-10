@@ -201,7 +201,13 @@ async function main() {
   console.log(`  "let me check with my husband" means it's time to follow up.`);
   console.log(`  `);
   console.log(`  Same model. Same data. The only difference: whether temporal`);
-  console.log(`  relationships are pre-computed as facts the model can read.${RESET}\n`);
+  console.log(`  relationships are pre-computed as facts the model can read.`);
+  console.log(`  `);
+  console.log(`  Research confirms this pattern:`);
+  console.log(`  • TicToc (2025): Without explicit timestamps, LLM agents perform`);
+  console.log(`    "similarly to random guessing" — timestamps appear in <4% of traces`);
+  console.log(`  • Real-Time Deadlines (2026): Pre-computed time updates boosted`);
+  console.log(`    deal closure from 4% to 32% — zero model changes${RESET}\n`);
 }
 
 main().catch(console.error);

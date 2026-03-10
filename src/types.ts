@@ -20,15 +20,6 @@ export type ToolCall = {
   result: string;
 };
 
-export type TraceEntry = {
-  scenario: string;
-  timestamp: string;
-  model_saw: string;        // the temporal context block
-  model_decided: string;    // the agent's response text
-  tools_called: ToolCall[];
-  duration_ms: number;
-};
-
 export type EvalResult = {
   scenario: string;
   variant: string;

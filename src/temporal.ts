@@ -56,7 +56,7 @@ export function buildConversationTimingContext(
   // Signal framing — same temporal fact, different sentence structure.
   // 'passive': third-person observation ("Contact is waiting for your reply")
   // 'directive': second-person awareness ("You are replying Xh after their last message")
-  // Demo 5 toggles this to show that framing changes whether the model acts.
+  // Demo 2 toggles this to show that framing changes whether the model acts.
   signalFraming: 'passive' | 'directive' = 'passive',
 ): string {
   if (messages.length === 0) return '';

@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════════
-// DEMO 6: Enforcement Gates
+// DEMO 3: Enforcement Gates
 // Presentation: Part 8 — Enforcement (E)
 //
-// Run: npm run demo:6
+// Run: npm run demo:3
 //
 // Enforcement gates are rules that NEVER become model decisions.
 // The test: is the consequence legal, financial, or trust-destroying
@@ -28,7 +28,7 @@ const YELLOW = '\x1b[33m';
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
 
-console.log(`\n${BOLD}${CYAN}══ DEMO 6: Enforcement Gates ══${RESET}\n`);
+console.log(`\n${BOLD}${CYAN}══ DEMO 3: Enforcement Gates ══${RESET}\n`);
 
 // --- Opt-out: legal enforcement ---
 console.log(`${BOLD}${YELLOW}▸ OPT-OUT (legal — $500–$1,500 per text)${RESET}\n`);
@@ -120,10 +120,6 @@ console.log(`  ${GREEN}Interpretation (model decides):${RESET}`);
 console.log(`    • Follow up after reply?          ${DIM}"my husband said yes" ≠ "ok thanks"${RESET}`);
 console.log(`    • How persistent to be?           ${DIM}depends on conversation context${RESET}`);
 console.log(`    • What tone to use?               ${DIM}depends on elapsed time and urgency${RESET}`);
-
-// ✏️ TRY: What if you lower the duplication cap to 3? Change the cap
-// parameter in src/enforcement.ts and re-run — the "3 active" case
-// will now be blocked too.
 
 console.log(`\n${DIM}  The test: is the consequence legal, financial, or trust-destroying`);
 console.log(`  in a way that's context-independent? If yes → enforcement.`);

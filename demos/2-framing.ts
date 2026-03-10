@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════════
-// DEMO 5: Signal Framing (The Context Engineering Flywheel)
+// DEMO 2: Signal Framing (The Context Engineering Proof)
 // Presentation: Part 7 — Context Engineering (C)
 //
-// Run: npm run demo:5
+// Run: npm run demo:2
 //
 // Recreates a real production finding: the delayed-response signal
 // went from 0.10 to 0.90 differentiation by rewording alone.
@@ -12,6 +12,11 @@
 //   Directive: "DELAYED RESPONSE: You are replying 1d after their last message"
 //
 // Same data. Same model. The framing changes whether it acts on it.
+//
+// This is a Directional Expectation Test (Ribeiro et al., ACL 2020):
+// given a meaningful change in input, does the output change in the
+// expected direction? Research shows framing shifts of up to 18%
+// from simple prepended phrases (Merkelbach, 2025).
 // ══════════════════════════════════════════════════════════════
 
 import { runAgent } from '../src/executor';
@@ -64,7 +69,7 @@ function extractSmsContent(result: { response: string; tools_called: { tool: str
 }
 
 async function main() {
-  console.log(`\n${BOLD}${CYAN}══ DEMO 5: Signal Framing ══${RESET}\n`);
+  console.log(`\n${BOLD}${CYAN}══ DEMO 2: Signal Framing ══${RESET}\n`);
 
   // --- Show both framings ---
   console.log(`${BOLD}${YELLOW}▸ THE EXPERIMENT${RESET}\n`);
@@ -141,7 +146,9 @@ async function main() {
   console.log(`  ${RED}Passive:${RESET}   ${DIM}"Contact is waiting for your reply (3h)"${RESET}  ${DIM}→ observation${RESET}`);
   console.log(`  ${GREEN}Directive:${RESET} ${DIM}"You are replying 3h after their last message"${RESET} ${DIM}→ awareness${RESET}`);
   console.log(`\n  ${BOLD}Address the agent, not the contact.${RESET}`);
-  console.log(`  ${DIM}Second-person framing creates awareness. Third-person creates observation.${RESET}\n`);
+  console.log(`  ${DIM}Second-person framing creates awareness. Third-person creates observation.${RESET}`);
+  console.log(`  ${DIM}Research confirms: up to 18% performance shift from framing alone.${RESET}`);
+  console.log(`  ${DIM}Generic personas don't help — specificity is the mechanism.${RESET}\n`);
 }
 
 main().catch(console.error);
