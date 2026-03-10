@@ -51,9 +51,7 @@ async function main() {
   });
 
   console.log(`${DIM}  Running faucet (aware)...${RESET}`);
-  const awareFaucet = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW, {
-    signalFraming: 'directive',
-  });
+  const awareFaucet = await runAgent(FAUCET_MESSAGES, FAUCET_CUSTOMER, THURSDAY_NOW);
 
   console.log(`${DIM}  Running burst pipe (blind)...${RESET}`);
   const blindBurst = await runAgent(BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW, {
@@ -61,9 +59,7 @@ async function main() {
   });
 
   console.log(`${DIM}  Running burst pipe (aware)...${RESET}\n`);
-  const awareBurst = await runAgent(BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW, {
-    signalFraming: 'directive',
-  });
+  const awareBurst = await runAgent(BURST_PIPE_MESSAGES, BURST_PIPE_CUSTOMER, SATURDAY_NOW);
 
   // ─── Faucet: blind vs aware ────────────────────────────────
 

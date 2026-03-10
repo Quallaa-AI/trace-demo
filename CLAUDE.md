@@ -22,7 +22,7 @@ The framework implements a layered approach to temporal awareness for conversati
 ### Core Layers (in `src/`)
 
 - **`types.ts`** — Shared types imported by all other files: `Message`, `Contact`, `ToolCall`, `DifferentiationResult`
-- **`temporal.ts`** — Core temporal fix. Converts raw ISO timestamps into relative durations ("3m ago", "1d ago") and builds structured timing context blocks (who's waiting, burst detection, conversation span). Two signal framings: `passive` vs `directive` — directive framing produces measurably higher differentiation scores in evals.
+- **`temporal.ts`** — Core temporal fix. Converts raw ISO timestamps into relative durations ("3m ago", "1d ago") and builds structured timing context blocks (who's waiting, burst detection, conversation span). Optional response pattern block adds factual comparison of reply speeds ("Contact replied in 2m. You have not replied in 3h.") — Demo 2 toggles this to show that computed facts change behavior.
 - **`conversation.ts`** — Test fixtures: the faucet customer story (Sarah Chen, Tuesday afternoon) and burst pipe variant (Mike Torres, Saturday night). All timestamps are absolute so temporal computation can transform them relative to any "now."
 - **`tools.ts`** — Four agent tools (`send_sms`, `schedule_followup`, `check_schedule`, `cancel_event`) with trust boundaries built into handlers (opt-out checks, message length caps, duplication limits). Uses an in-memory `toolLog` for test assertions.
 - **`enforcement.ts`** — Hard enforcement gates that are never model decisions: opt-out blocking, race condition guards, duplication caps. Pure functions with injectable `now` for testability.
@@ -41,7 +41,7 @@ Numbered 0–3, each maps to a section of the presentation. Run with `npm run de
 
 - **Demo 0** — Temporal Blindness: blind vs aware comparison with differentiation scoring
 - **Demo 1** — What the Model Sees: raw timestamps vs relative durations + timing context
-- **Demo 2** — Signal Framing: passive vs directive framing, differentiation scoring
+- **Demo 2** — Response Pattern: without vs with computed response asymmetry, differentiation scoring
 - **Demo 3** — Enforcement Gates: opt-out, race guard, duplication cap, enforcement vs interpretation
 
 ### Tests (`tests/`)

@@ -1,17 +1,16 @@
 // ══════════════════════════════════════════════════════════════
-// DEMO 2: Signal Framing (The Context Engineering Proof)
+// DEMO 2: Response Pattern (The Context Engineering Proof)
 // Presentation: Part 7 — Context Engineering (C)
 //
 // Run: npm run demo:2
 //
-// Recreates a real production finding: the delayed-response signal
-// went from 0.10 to 0.90 differentiation by rewording alone.
+// Same temporal facts, but one version adds a computed comparison:
+// how fast the contact replied vs how long your reply has been pending.
 //
-// Same temporal fact, two framings:
-//   Passive:   "Contact is waiting for your reply (3h)"
-//   Directive: "DELAYED RESPONSE: You are replying 3h after their last message"
+//   Without: "Last message from contact: 3h ago"
+//   With:    + "Contact replied to you in 2m. You have not replied in 3h."
 //
-// Same data. Same model. The framing changes whether it acts on it.
+// Pure facts. No labels. No directives. The model draws its own conclusion.
 // ══════════════════════════════════════════════════════════════
 
 import { runAgent } from '../src/executor';
@@ -34,10 +33,10 @@ const THREE_HOURS_LATER = new Date('2026-03-10T17:49:00-07:00');
 // The customer asked a question and is waiting for a reply.
 const waitingForReply: Message[] = FAUCET_MESSAGES.slice(0, 2);
 
-const diffContext = `Same scenario: a customer described a leaky faucet 3 hours ago and is waiting for a reply. Two framings of the same temporal fact were used.
-Response A used passive framing: "Contact is waiting for your reply (3h)" — third-person observation.
-Response B used directive framing: "DELAYED RESPONSE: You are replying 3h after their last message" — second-person, labeled for salience.
-The question: did the directive framing cause the agent to behave differently in urgency, action taken, and tone (e.g., acknowledging the delay, apologizing, adjusting approach)?`;
+const diffContext = `Same scenario: a customer described a leaky faucet 3 hours ago and is waiting for a reply. Two versions of temporal context were used.
+Response A had basic timing context: elapsed times only ("Last message from contact: 3h ago").
+Response B had the same timing context plus a response pattern comparison: "Contact replied to you in 2 minutes. You have not replied in 3 hours." — two factual durations highlighting the asymmetry.
+The question: did the response pattern signal cause the agent to behave differently in urgency, action taken, or tone (e.g., acknowledging the delay, apologizing, adjusting approach)?`;
 
 // Extract the SMS content from tool calls — the actual message sent,
 // not Claude's narration text.
@@ -50,24 +49,24 @@ function extractSmsContent(result: { response: string; tools_called: { tool: str
 }
 
 async function main() {
-  console.log(`\n${BOLD}${CYAN}══ DEMO 2: Signal Framing ══${RESET}\n`);
+  console.log(`\n${BOLD}${CYAN}══ DEMO 2: Response Pattern ══${RESET}\n`);
 
-  // --- Show both framings ---
+  // --- Show both contexts ---
   console.log(`${BOLD}${YELLOW}▸ THE EXPERIMENT${RESET}\n`);
-  console.log(`  Same scenario, same data. One signal reworded.\n`);
+  console.log(`  Same scenario, same data. One adds a computed fact.\n`);
 
-  const passive = buildConversationTimingContext(waitingForReply, THREE_HOURS_LATER, 'passive');
-  const directive = buildConversationTimingContext(waitingForReply, THREE_HOURS_LATER, 'directive');
+  const without = buildConversationTimingContext(waitingForReply, THREE_HOURS_LATER, false);
+  const withPattern = buildConversationTimingContext(waitingForReply, THREE_HOURS_LATER, true);
 
-  console.log(`  ${BOLD}Passive framing (third-person observation):${RESET}`);
-  for (const line of passive.split('\n')) {
+  console.log(`  ${BOLD}Without response pattern:${RESET}`);
+  for (const line of without.split('\n')) {
     console.log(`    ${DIM}${line}${RESET}`);
   }
   console.log('');
 
-  console.log(`  ${BOLD}Directive framing (second-person, labeled):${RESET}`);
-  for (const line of directive.split('\n')) {
-    if (line.startsWith('DELAYED')) {
+  console.log(`  ${BOLD}With response pattern:${RESET}`);
+  for (const line of withPattern.split('\n')) {
+    if (line.includes('RESPONSE PATTERN') || line.includes('Contact replied')) {
       console.log(`    ${GREEN}${line}${RESET}`);
     } else {
       console.log(`    ${DIM}${line}${RESET}`);
@@ -77,29 +76,29 @@ async function main() {
   // --- Run both through Claude ---
   console.log(`\n${BOLD}${YELLOW}▸ RUNNING BOTH THROUGH CLAUDE...${RESET}\n`);
 
-  console.log(`  ${DIM}Passive framing...${RESET}`);
-  const passiveResult = await runAgent(
+  console.log(`  ${DIM}Without response pattern...${RESET}`);
+  const withoutResult = await runAgent(
     waitingForReply, FAUCET_CUSTOMER, THREE_HOURS_LATER,
-    { signalFraming: 'passive' },
+    { includeResponsePattern: false },
   );
-  const passiveSms = extractSmsContent(passiveResult);
-  console.log(`  SMS: "${passiveSms.substring(0, 120)}${passiveSms.length > 120 ? '...' : ''}"\n`);
+  const withoutSms = extractSmsContent(withoutResult);
+  console.log(`  SMS: "${withoutSms.substring(0, 120)}${withoutSms.length > 120 ? '...' : ''}"\n`);
 
-  console.log(`  ${DIM}Directive framing...${RESET}`);
-  const directiveResult = await runAgent(
+  console.log(`  ${DIM}With response pattern...${RESET}`);
+  const withResult = await runAgent(
     waitingForReply, FAUCET_CUSTOMER, THREE_HOURS_LATER,
-    { signalFraming: 'directive' },
+    { includeResponsePattern: true },
   );
-  const directiveSms = extractSmsContent(directiveResult);
-  console.log(`  SMS: "${directiveSms.substring(0, 120)}${directiveSms.length > 120 ? '...' : ''}"\n`);
+  const withSms = extractSmsContent(withResult);
+  console.log(`  SMS: "${withSms.substring(0, 120)}${withSms.length > 120 ? '...' : ''}"\n`);
 
   // --- Score differentiation ---
   console.log(`${BOLD}${YELLOW}▸ DIFFERENTIATION SCORE${RESET}\n`);
 
   const diff = await scoreDifferentiation(
-    'signal-framing-experiment',
-    passiveSms, 'passive',
-    directiveSms, 'directive',
+    'response-pattern-experiment',
+    withoutSms, 'without-pattern',
+    withSms, 'with-pattern',
     diffContext,
   );
 
@@ -107,13 +106,12 @@ async function main() {
 
   // --- The finding ---
   console.log(`\n${BOLD}${YELLOW}▸ THE FINDING${RESET}\n`);
-  console.log(`  ${DIM}Same data. Same model. One signal reworded.${RESET}`);
-  console.log(`  \x1b[31mPassive:\x1b[0m   ${DIM}"Contact is waiting for your reply (3h)"${RESET}`);
-  console.log(`  ${GREEN}Directive:${RESET} ${DIM}"DELAYED RESPONSE: You are replying 3h after their last message"${RESET}`);
-  console.log(`\n  ${BOLD}Address the agent, not the contact.${RESET}`);
-  console.log(`  ${DIM}Second-person framing creates awareness. Third-person creates observation.${RESET}`);
-  console.log(`  ${DIM}Research confirms: up to 18% performance shift from framing alone.${RESET}`);
-  console.log(`  ${DIM}Generic personas don't help — specificity is the mechanism.${RESET}\n`);
+  console.log(`  ${DIM}Same data. Same model. One computed fact added.${RESET}`);
+  console.log(`  \x1b[31mWithout:\x1b[0m ${DIM}"Last message from contact: 3h ago"${RESET}`);
+  console.log(`  ${GREEN}With:${RESET}    ${DIM}+ "Contact replied to you in 2m. You have not replied in 3h."${RESET}`);
+  console.log(`\n  ${BOLD}Inject facts, not interpretations.${RESET}`);
+  console.log(`  ${DIM}The model sees two durations and draws its own conclusion.${RESET}`);
+  console.log(`  ${DIM}No labels. No directives. Just computed facts.${RESET}\n`);
 }
 
 main().catch(console.error);

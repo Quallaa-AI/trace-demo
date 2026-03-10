@@ -58,12 +58,11 @@ export async function runAgent(
   contact: Contact,
   now: Date,
   opts: {
-    signalFraming?: 'passive' | 'directive';
-    scenario?: string;
+    includeResponsePattern?: boolean;
     skipTemporalContext?: boolean;
   } = {},
 ): Promise<ExecutorResult> {
-  const signalFraming = opts.signalFraming ?? 'passive';
+  const includeResponsePattern = opts.includeResponsePattern ?? false;
   const skipTemporal = opts.skipTemporalContext ?? false;
 
   // Build the full system prompt — with or without temporal context
@@ -80,7 +79,7 @@ export async function runAgent(
     }).join('\n');
   } else {
     const timeContext = buildCurrentTimeContext(now, contact.timezone);
-    const timingContext = buildConversationTimingContext(messages, now, signalFraming);
+    const timingContext = buildConversationTimingContext(messages, now, includeResponsePattern);
     fullSystem = [SYSTEM_PROMPT, '', timeContext, '', timingContext].join('\n');
     conversationBlock = annotateMessages(messages, now);
   }

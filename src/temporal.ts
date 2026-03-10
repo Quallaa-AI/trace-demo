@@ -51,11 +51,11 @@ export function annotateMessages(messages: Message[], now: Date): string {
 export function buildConversationTimingContext(
   messages: Message[],
   now: Date,
-  // Signal framing — same temporal fact, different sentence structure.
-  // 'passive': third-person observation ("Contact is waiting for your reply")
-  // 'directive': second-person awareness ("You are replying Xh after their last message")
-  // Demo 2 toggles this to show that framing changes whether the model acts.
-  signalFraming: 'passive' | 'directive' = 'passive',
+  // Whether to include the response pattern block.
+  // When true, adds a factual comparison: how fast the contact replied
+  // vs how long your reply has been pending. Demo 2 toggles this to show
+  // that adding computed facts changes whether the model acts.
+  includeResponsePattern = false,
 ): string {
   if (messages.length === 0) return '';
 
@@ -85,22 +85,6 @@ export function buildConversationTimingContext(
   // Response gap — who sent the last message and how long ago?
   const lastMsg = messages[messages.length - 1];
 
-  // Response gap signal — same fact, two framings.
-  // Passive: third-person observation about the contact.
-  // Directive: second-person, labeled for salience.
-  let delayedResponseLine = '';
-
-  if (lastMsg.role === 'customer' && lastAgent) {
-    const gapMs = now.getTime() - new Date(lastMsg.timestamp).getTime();
-    const gapStr = formatDuration(gapMs);
-
-    if (signalFraming === 'passive') {
-      lines.push(`Contact is waiting for your reply (${gapStr})`);
-    } else {
-      delayedResponseLine = `DELAYED RESPONSE: You are replying ${gapStr} after their last message.`;
-    }
-  }
-
   if (lastMsg.role === 'agent' && lastCustomer) {
     // Agent sent the last message — waiting for customer
     const waitMs = now.getTime() - new Date(lastMsg.timestamp).getTime();
@@ -108,11 +92,18 @@ export function buildConversationTimingContext(
   }
 
   // Contact response latency (last role-switch gap)
+  let contactReplyDuration = '';
   for (let i = messages.length - 1; i > 0; i--) {
     if (messages[i].role !== messages[i - 1].role) {
       const gap = new Date(messages[i].timestamp).getTime() - new Date(messages[i - 1].timestamp).getTime();
       if (messages[i].role === 'customer') {
-        lines.push(`Contact's last reply took ${formatDuration(gap)}`);
+        contactReplyDuration = formatDuration(gap);
+        // Only include in the basic block when response pattern is off.
+        // When response pattern is on, this fact moves to the pattern block
+        // where it's paired with the agent's pending reply time.
+        if (!includeResponsePattern) {
+          lines.push(`Contact's last reply took ${contactReplyDuration}`);
+        }
       }
       break;
     }
@@ -132,9 +123,16 @@ export function buildConversationTimingContext(
   lines.push(`Conversation spans ${formatDuration(spanMs)} (${messages.length} messages)`);
 
   const timingBlock = `--- CONVERSATION TIMING ---\n[${lines.join('. ')}.]`;
-  if (delayedResponseLine) {
-    return `${timingBlock}\n${delayedResponseLine}`;
+
+  // Response pattern — factual comparison of reply speeds.
+  // When the contact replied quickly but your reply is pending for much longer,
+  // the contrast speaks for itself. No labels needed.
+  if (includeResponsePattern && lastMsg.role === 'customer' && contactReplyDuration) {
+    const pendingMs = now.getTime() - new Date(lastMsg.timestamp).getTime();
+    const pendingStr = formatDuration(pendingMs);
+    return `${timingBlock}\n--- RESPONSE PATTERN ---\n[Contact replied to you in ${contactReplyDuration}. You have not replied in ${pendingStr}.]`;
   }
+
   return timingBlock;
 }
 

@@ -54,26 +54,27 @@ describe('buildConversationTimingContext', () => {
     expect(result).toContain('unanswered');
   });
 
-  test('passive framing uses third-person observation', () => {
+  test('without response pattern omits pattern block', () => {
     const withCustomerLast = [...FAUCET_MESSAGES, {
       role: 'customer' as const,
       content: 'Actually, I changed my mind',
       timestamp: '2026-03-10T15:00:00-07:00',
     }];
-    const result = buildConversationTimingContext(withCustomerLast, THURSDAY_NOW, 'passive');
-    expect(result).toContain('Contact is waiting for your reply');
-    expect(result).not.toContain('DELAYED RESPONSE');
+    const result = buildConversationTimingContext(withCustomerLast, THURSDAY_NOW, false);
+    expect(result).not.toContain('RESPONSE PATTERN');
+    expect(result).not.toContain('You have not replied');
   });
 
-  test('directive framing uses second-person awareness', () => {
+  test('with response pattern adds factual comparison', () => {
     const withCustomerLast = [...FAUCET_MESSAGES, {
       role: 'customer' as const,
       content: 'Actually, I changed my mind',
       timestamp: '2026-03-10T15:00:00-07:00',
     }];
-    const result = buildConversationTimingContext(withCustomerLast, THURSDAY_NOW, 'directive');
-    expect(result).toContain('DELAYED RESPONSE: You are replying');
-    expect(result).not.toContain('Contact is waiting');
+    const result = buildConversationTimingContext(withCustomerLast, THURSDAY_NOW, true);
+    expect(result).toContain('--- RESPONSE PATTERN ---');
+    expect(result).toContain('Contact replied to you in');
+    expect(result).toContain('You have not replied in');
   });
 
   test('returns empty string for no messages', () => {
